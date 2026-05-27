@@ -1,3 +1,16 @@
 pip freeze > requirements.txt
 
-venv\Scripts\python.exe -m pip install pyinstaller; venv\Scripts\python.exe -m PyInstaller --noconfirm --clean --windowed --onefile --name ClipFlow --add-data "assets;assets" --add-data "ffmpeg;ffmpeg" app.py
+Chỉ test + tăng version + build + nén zip, nhưng chưa upload/push.
+python.exe check.py --publish
+
+python check.py
+
+python check.py
+ = full publish luôn.
+
+
+python check.py --local
+ = chỉ test/build local, không push.
+
+python check.py --no-bump --no-build
+ = kiểm tra nhanh.
