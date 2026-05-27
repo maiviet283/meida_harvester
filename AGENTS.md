@@ -9,6 +9,11 @@
 ## Architecture
 
 - Entry point: `app.py`.
+- App version: `app/version.py`.
+- Startup updater: `app/updater.py`.
+  - Check manifest từ `update.json` trên GitHub.
+  - Không tự cập nhật khi chạy source bằng Python; self-update chỉ dùng cho bản `.exe` đã build.
+  - Bản release tự cập nhật phải upload file `ClipFlow.zip` lên GitHub Releases theo `download_url` trong manifest.
 - Main shell: `app/main_window.py`.
   - Chỉ quản lý cửa sổ chính, sidebar, menu nền tảng, theme, ngôn ngữ, icon, dialog thoát.
   - Không đặt logic tải video theo nền tảng trong file này.
@@ -32,6 +37,8 @@
 ```text
 app/
 |-- main_window.py
+|-- updater.py
+|-- version.py
 |-- themes.py
 |-- locales/
 |   |-- __init__.py
