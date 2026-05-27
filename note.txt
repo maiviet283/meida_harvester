@@ -8,9 +8,5 @@ python check.py
 python check.py
  = full publish luôn.
 
-
-python check.py --local
- = chỉ test/build local, không push.
-
 python check.py --no-bump --no-build
  = kiểm tra nhanh.
