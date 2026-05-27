@@ -14,6 +14,14 @@
   - Check manifest từ `update.json` trên GitHub.
   - Không tự cập nhật khi chạy source bằng Python; self-update chỉ dùng cho bản `.exe` đã build.
   - Bản release tự cập nhật phải upload file `ClipFlow.zip` lên GitHub Releases theo `download_url` trong manifest.
+- Update UI/gate: `app/update_ui.py`.
+  - App check update khi khởi động và trước khi bắt đầu tải.
+  - Nếu không kiểm tra được manifest GitHub thì chặn sử dụng để đảm bảo người dùng luôn ở bản mới nhất.
+- Release gate: chạy `python check.py` trước khi push/release.
+  - Script chạy unittest, tăng patch version trong `app/version.py`, đặt `latest_version` và `minimum_supported_version` trong `update.json` bằng version mới, build `dist/ClipFlow.exe`, rồi nén `release/ClipFlow.zip`.
+  - Dùng `python check.py --publish` sau khi đã commit sạch code để script tự tạo release commit, tag, GitHub Release, upload `release/ClipFlow.zip`, rồi push branch.
+  - `--publish` cần GitHub CLI (`gh`) đã đăng nhập bằng `gh auth login`; script sẽ từ chối chạy nếu working tree còn dirty để tránh publish nhầm.
+  - Dùng `python check.py --no-bump --no-build` khi chỉ muốn kiểm tra nhanh mà không đổi version hoặc build.
 - Main shell: `app/main_window.py`.
   - Chỉ quản lý cửa sổ chính, sidebar, menu nền tảng, theme, ngôn ngữ, icon, dialog thoát.
   - Không đặt logic tải video theo nền tảng trong file này.
@@ -38,8 +46,11 @@
 app/
 |-- main_window.py
 |-- updater.py
+|-- update_ui.py
 |-- version.py
 |-- themes.py
+|-- tests/
+|   `-- test_tiktok_service.py
 |-- locales/
 |   |-- __init__.py
 |   |-- vi.py

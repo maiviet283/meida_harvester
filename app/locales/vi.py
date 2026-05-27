@@ -87,6 +87,8 @@ TEXT = {
         "restart_message": "ClipFlow sẽ đóng để cài bản cập nhật, sau đó tự mở lại.",
         "failed_title": "Cập nhật thất bại",
         "failed_message": "Không thể cài bản cập nhật: {error}",
+        "check_failed_title": "Không thể kiểm tra phiên bản",
+        "check_failed_message": "ClipFlow cần kiểm tra bản mới nhất trước khi chạy. Hãy kiểm tra kết nối mạng rồi mở lại app.\n\nChi tiết: {error}",
         "dev_mode_title": "Chưa thể tự cập nhật",
         "dev_mode_message": "Tự cập nhật chỉ chạy trên bản .exe đã build. Khi chạy source bằng Python, hãy cập nhật bằng git hoặc build lại app.",
     },

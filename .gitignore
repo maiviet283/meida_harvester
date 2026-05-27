@@ -19,6 +19,7 @@ htmlcov/
 # Build outputs
 build/
 dist/
+release/
 *.egg-info/
 
 # Local runtime files

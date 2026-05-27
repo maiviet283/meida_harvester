@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
 
 from app.locales import translate
 from app.platforms.common import BaseDownloadService, PlatformConfig, UserFacingDownloadError
+from app.update_ui import ensure_update_allowed
 
 
 class DownloadWorker(QObject):
@@ -201,6 +202,8 @@ class DownloadPanel(QFrame):
             self.choose_folder()
             if not self.save_path:
                 return
+        if not ensure_update_allowed(self.language_getter()):
+            return
 
         self.progress.setValue(0)
         self.status.setText(self.t("status.preparing"))

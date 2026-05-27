@@ -87,6 +87,8 @@ TEXT = {
         "restart_message": "ClipFlow will close to install the update, then open again.",
         "failed_title": "Update failed",
         "failed_message": "Could not install the update: {error}",
+        "check_failed_title": "Could not check app version",
+        "check_failed_message": "ClipFlow must verify the latest version before running. Check your network connection, then open the app again.\n\nDetails: {error}",
         "dev_mode_title": "Self-update unavailable",
         "dev_mode_message": "Self-update only works in packaged .exe builds. When running from Python source, update with git or rebuild the app.",
     },
