@@ -15,6 +15,14 @@ TIKTOK_SPLIT_MP4_FORMATS = (
     "bv*[ext=mp4][vcodec=h264]+ba[ext=m4a]",
     "bv*[ext=mp4][vcodec^=avc1]+ba[ext=m4a]",
 )
+TIKTOK_FALLBACK_VIDEO_FORMATS = (
+    "b[ext=mp4][vcodec!=none][acodec!=none]",
+    "b[vcodec!=none][acodec!=none]",
+)
+TIKTOK_FALLBACK_SPLIT_FORMATS = (
+    "bv*[ext=mp4][vcodec!=none]+ba[ext=m4a]",
+    "bv*[vcodec!=none]+ba",
+)
 
 
 CONFIG = PlatformConfig(
@@ -42,6 +50,9 @@ class TikTokService(BaseDownloadService):
         has_ffmpeg = self.has_ffmpeg()
         if has_ffmpeg:
             formats.extend(TIKTOK_SPLIT_MP4_FORMATS)
+        formats.extend(TIKTOK_FALLBACK_VIDEO_FORMATS)
+        if has_ffmpeg:
+            formats.extend(TIKTOK_FALLBACK_SPLIT_FORMATS)
 
         options = self.base_yt_dlp_options(folder, hook, single)
         options.update(
@@ -52,4 +63,24 @@ class TikTokService(BaseDownloadService):
         )
         if has_ffmpeg:
             options["merge_output_format"] = "mp4"
+        if not single:
+            options["ignoreerrors"] = "only_download"
+            options["match_filter"] = self.reject_non_video_post
         return options
+
+    def reject_non_video_post(self, info: dict, *args, **kwargs) -> str | None:
+        if kwargs.get("incomplete"):
+            return None
+
+        formats = info.get("formats") or []
+        if not formats:
+            return None if self.has_video_track(info) else "Skipped TikTok image/slideshow post"
+        if any(self.has_video_track(format_info) for format_info in formats):
+            return None
+        return "Skipped TikTok image/slideshow post"
+
+    def has_video_track(self, format_info: dict) -> bool:
+        vcodec = format_info.get("vcodec")
+        if vcodec and vcodec != "none":
+            return True
+        return vcodec is None and format_info.get("ext") in {"mp4", "mov", "webm", "mkv"}

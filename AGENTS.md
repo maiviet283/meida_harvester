@@ -71,10 +71,10 @@ app/
 - Lỗi từ `yt-dlp` phải được map sang `UserFacingDownloadError` trong `app/platforms/common.py`, không để raw error kỹ thuật tràn ra UI.
 - `BaseDownloadService` chỉ giữ vòng đời tải chung: tạo thư mục, progress hook, gọi `yt-dlp`, map lỗi, helper FFmpeg và lọc duration.
 - Mỗi nền tảng tự định nghĩa `build_yt_dlp_options()` trong `app/platforms/<platform>/service.py`; không đặt format/codec policy theo nền tảng trong base.
-- TikTok đang ưu tiên MP4 tương thích trình phát phổ biến: video H.264 và audio AAC; chỉ dùng stream video/audio tách rời khi tìm thấy FFmpeg.
+- TikTok đang ưu tiên MP4 tương thích trình phát phổ biến: video H.264 và audio AAC; nếu là video thật thì fallback sang format video khác để không bỏ sót, và chỉ dùng stream video/audio tách rời khi tìm thấy FFmpeg.
 - `Tải video`: dán một link video bất kỳ, tải một video riêng lẻ, không phân biệt ngắn/dài.
 - `Tải cả trang`:
-  - TikTok tải toàn bộ trang/profile theo link.
+  - TikTok tải toàn bộ trang/profile theo link; post ảnh/slideshow không có video track sẽ bị bỏ qua để batch tiếp tục chạy.
   - Facebook, Instagram, YouTube có lựa chọn:
     - Tải video ngắn toàn trang.
     - Tải video dài toàn trang.
