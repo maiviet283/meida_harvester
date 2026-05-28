@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"e:\\\\project\\\\media_harvester\" -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "PowerShell(Get-ChildItem -Path \"e:\\\\project\\\\media_harvester\" -Recurse -Directory | Select-Object -ExpandProperty FullName | ForEach-Object { $_ })"
+    ]
+  }
+}

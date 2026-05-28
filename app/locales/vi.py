@@ -69,6 +69,9 @@ TEXT = {
         "facebook_parse_failed": "Facebook không trả dữ liệu video cho link này. Hãy đăng nhập Facebook trên Edge/Chrome/Firefox của máy này, dùng link video/reel công khai, rồi thử lại.",
         "facebook_cookie_failed": "Không thể đọc cookie Facebook từ trình duyệt trên máy này.",
         "facebook_cookie_unavailable": "Không thể đọc cookie Facebook từ trình duyệt, và link này không tải được ở chế độ công khai. Hãy thử link video/reel công khai khác hoặc cập nhật yt-dlp.",
+        "youtube_single_link": "Link này không phải link video YouTube trực tiếp. Hãy dùng link dạng watch, youtube.com/shorts hoặc youtu.be.",
+        "youtube_age_restricted": "Video này bị giới hạn độ tuổi. Hiện app chỉ tải được nội dung công khai.",
+        "youtube_members_only": "Video này chỉ dành cho thành viên kênh và không thể tải nếu không có membership.",
         "download_failed": "Tải thất bại: {error}",
     },
     "dialog": {

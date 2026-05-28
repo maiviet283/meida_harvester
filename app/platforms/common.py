@@ -29,13 +29,15 @@ class UserFacingDownloadError(Exception):
 
 class YtDlpLogger:
     def debug(self, message: str) -> None:
-        return
+        if message.startswith("[debug]"):
+            return
+        print(f"[yt-dlp] {message}")
 
     def warning(self, message: str) -> None:
-        return
+        print(f"[yt-dlp] WARNING: {message}")
 
     def error(self, message: str) -> None:
-        return
+        print(f"[yt-dlp] ERROR: {message}")
 
 
 class BaseDownloadService:

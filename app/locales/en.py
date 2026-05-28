@@ -69,6 +69,9 @@ TEXT = {
         "facebook_parse_failed": "Facebook did not return video data for this link. Sign in to Facebook in Edge/Chrome/Firefox on this computer, use a public video/reel link, then try again.",
         "facebook_cookie_failed": "Could not read Facebook cookies from the browser on this computer.",
         "facebook_cookie_unavailable": "Could not read Facebook browser cookies, and this link cannot be downloaded as public content. Try another public video/reel link or update yt-dlp.",
+        "youtube_single_link": "This is not a direct YouTube video link. Use a watch, youtube.com/shorts, or youtu.be link.",
+        "youtube_age_restricted": "This video is age-restricted. The app currently downloads public content only.",
+        "youtube_members_only": "This video is for channel members only and cannot be downloaded without a membership.",
         "download_failed": "Download failed: {error}",
     },
     "dialog": {
