@@ -100,7 +100,10 @@ app/
   - Mặc định là tải video ngắn toàn trang.
 - Facebook:
   - Link `/people/...` không tải toàn trang ổn định bằng `yt-dlp`, đang được chặn sớm và hiển thị hướng dẫn người dùng.
-  - Tải 1 video Facebook ưu tiên link dạng `watch`, `videos`, `reel`, `share/v`, `share/r`, hoặc `fb.watch`.
+  - Tải 1 video Facebook ưu tiên link dạng `watch`, `video.php`, `videos`, `reel`, `share/v`, `share/r`, `story.php`, `permalink.php`, `posts`, `groups`, hoặc `fb.watch`.
+  - Facebook service tự dùng cookie từ Firefox/Edge/Chrome nếu tìm thấy profile browser để giảm lỗi login/anti-bot.
+  - Nếu đọc cookie browser lỗi DPAPI, service tự retry không dùng cookie; nếu link vẫn không tải công khai được thì báo lỗi cookie thân thiện.
+  - Link `share/r/<id>` và `share/v/<id>` có ID số được normalize sang `reel/<id>` hoặc `watch/?v=<id>` trước khi tải.
 - Quy ước lọc duration hiện tại:
   - Video ngắn: `duration <= 180` giây.
   - Video dài: `duration >= 181` giây.

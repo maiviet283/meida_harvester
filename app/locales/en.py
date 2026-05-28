@@ -66,6 +66,9 @@ TEXT = {
         "login_required": "This content requires login or is not public. The app currently downloads public links only.",
         "facebook_single_link": "This is not a direct Facebook video link. Use a watch, videos, reel, or fb.watch link.",
         "facebook_people_page": "Facebook /people/... profiles are not reliable for full-page downloads through yt-dlp. Use a single video/reel link or a public page video tab.",
+        "facebook_parse_failed": "Facebook did not return video data for this link. Sign in to Facebook in Edge/Chrome/Firefox on this computer, use a public video/reel link, then try again.",
+        "facebook_cookie_failed": "Could not read Facebook cookies from the browser on this computer.",
+        "facebook_cookie_unavailable": "Could not read Facebook browser cookies, and this link cannot be downloaded as public content. Try another public video/reel link or update yt-dlp.",
         "download_failed": "Download failed: {error}",
     },
     "dialog": {

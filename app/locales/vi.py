@@ -66,6 +66,9 @@ TEXT = {
         "login_required": "Nội dung này cần đăng nhập hoặc không công khai. Hiện app chỉ tải được link công khai.",
         "facebook_single_link": "Link này không phải link video Facebook trực tiếp. Hãy dùng link dạng watch, videos, reel hoặc fb.watch.",
         "facebook_people_page": "Facebook profile dạng /people/... chưa tải toàn trang ổn định bằng yt-dlp. Hãy dùng link video/reel riêng lẻ hoặc link trang công khai có tab video.",
+        "facebook_parse_failed": "Facebook không trả dữ liệu video cho link này. Hãy đăng nhập Facebook trên Edge/Chrome/Firefox của máy này, dùng link video/reel công khai, rồi thử lại.",
+        "facebook_cookie_failed": "Không thể đọc cookie Facebook từ trình duyệt trên máy này.",
+        "facebook_cookie_unavailable": "Không thể đọc cookie Facebook từ trình duyệt, và link này không tải được ở chế độ công khai. Hãy thử link video/reel công khai khác hoặc cập nhật yt-dlp.",
         "download_failed": "Tải thất bại: {error}",
     },
     "dialog": {
