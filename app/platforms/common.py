@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from http.cookies import CookieError, SimpleCookie
 from pathlib import Path
 import shutil
+import tempfile
 from typing import Callable
 
 from yt_dlp import YoutubeDL
-from yt_dlp.utils import DownloadError
+from yt_dlp.utils import DownloadCancelled, DownloadError
 
 
 ProgressCallback = Callable[[str, int, dict[str, str] | None], None]
@@ -18,6 +20,7 @@ class PlatformConfig:
     example_video_url: str
     example_page_url: str
     supports_page_filters: bool = False
+    supports_manual_cookies: bool = False
 
 
 class UserFacingDownloadError(Exception):
@@ -41,6 +44,87 @@ class YtDlpLogger:
 
 
 class BaseDownloadService:
+    def request_cancel(self) -> None:
+        self.cancel_requested = True
+
+    def is_cancel_requested(self) -> bool:
+        return bool(getattr(self, "cancel_requested", False))
+
+    def raise_if_cancelled(self) -> None:
+        if self.is_cancel_requested():
+            raise DownloadCancelled()
+
+    def set_manual_cookie_header(self, cookie_header: str) -> None:
+        self.manual_cookie_header = self.normalize_cookie_header(cookie_header)
+
+    def get_manual_cookie_header(self) -> str:
+        return getattr(self, "manual_cookie_header", "")
+
+    def normalize_cookie_header(self, cookie_header: str) -> str:
+        lines = [line.strip() for line in cookie_header.replace("\r", "\n").split("\n") if line.strip()]
+        for line in lines:
+            if line.lower().startswith("cookie:"):
+                return line.split(":", 1)[1].strip()
+        return " ".join(lines)
+
+    def apply_manual_cookies(self, options: dict, domains: tuple[str, ...]) -> bool:
+        cookie_header = self.get_manual_cookie_header()
+        if not cookie_header:
+            return False
+        cookies = self.parse_cookie_header(cookie_header)
+        if not cookies:
+            return False
+        options["cookiefile"] = str(self.write_manual_cookie_file(cookies, domains))
+        return True
+
+    def parse_cookie_header(self, cookie_header: str) -> list[tuple[str, str]]:
+        parsed = SimpleCookie()
+        try:
+            parsed.load(cookie_header)
+        except CookieError:
+            parsed = SimpleCookie()
+        cookies = [(name, morsel.value) for name, morsel in parsed.items()]
+        if cookies:
+            return cookies
+
+        fallback_cookies: list[tuple[str, str]] = []
+        for part in cookie_header.split(";"):
+            if "=" not in part:
+                continue
+            name, value = part.split("=", 1)
+            name = name.strip()
+            if name:
+                fallback_cookies.append((name, value.strip()))
+        return fallback_cookies
+
+    def write_manual_cookie_file(self, cookies: list[tuple[str, str]], domains: tuple[str, ...]) -> Path:
+        cookie_file = tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            delete=False,
+            prefix="clipflow_cookies_",
+            suffix=".txt",
+        )
+        path = Path(cookie_file.name)
+        with cookie_file:
+            cookie_file.write("# Netscape HTTP Cookie File\n")
+            for domain in domains:
+                normalized_domain = domain if domain.startswith(".") else f".{domain}"
+                for name, value in cookies:
+                    safe_name = name.replace("\t", "").replace("\r", "").replace("\n", "")
+                    safe_value = value.replace("\t", "").replace("\r", "").replace("\n", "")
+                    cookie_file.write(f"{normalized_domain}\tTRUE\t/\tTRUE\t2147483647\t{safe_name}\t{safe_value}\n")
+
+        files = getattr(self, "_manual_cookie_files", [])
+        files.append(path)
+        self._manual_cookie_files = files
+        return path
+
+    def cleanup_manual_cookie_files(self) -> None:
+        for path in getattr(self, "_manual_cookie_files", []):
+            path.unlink(missing_ok=True)
+        self._manual_cookie_files = []
+
     def download_single(self, url: str, folder: str, progress: ProgressCallback) -> None:
         self.download(url, folder, progress, single=True, page_filter="all")
 
@@ -61,10 +145,23 @@ class BaseDownloadService:
         single: bool,
         page_filter: str,
     ) -> None:
+        self.download_urls([url], folder, progress, single, page_filter)
+
+    def download_urls(
+        self,
+        urls: list[str],
+        folder: str,
+        progress: ProgressCallback,
+        single: bool,
+        page_filter: str,
+        emit_initial_progress: bool = True,
+    ) -> None:
         Path(folder).mkdir(parents=True, exist_ok=True)
-        progress("preparing", 8, None)
+        if emit_initial_progress:
+            progress("preparing", 8, None)
 
         def hook(info: dict) -> None:
+            self.raise_if_cancelled()
             status = info.get("status")
             if status == "downloading":
                 total = info.get("total_bytes") or info.get("total_bytes_estimate") or 0
@@ -74,17 +171,28 @@ class BaseDownloadService:
             elif status == "finished":
                 progress("processing", 95, None)
 
-        options = self.build_yt_dlp_options(folder, hook, single)
-        match_filter = self.build_match_filter(page_filter)
-        if match_filter:
-            options["match_filter"] = match_filter
-
-        progress("reading", 18, None)
         try:
+            options = self.build_yt_dlp_options(folder, hook, single)
+            match_filter = self.build_cancelable_match_filter(
+                options.get("match_filter"),
+                page_filter,
+                force=not single,
+            )
+            if match_filter:
+                options["match_filter"] = match_filter
+
+            if emit_initial_progress:
+                self.raise_if_cancelled()
+                progress("reading", 18, None)
+            self.raise_if_cancelled()
             with YoutubeDL(options) as downloader:
-                downloader.download([url])
+                downloader.download(urls)
+        except DownloadCancelled as exc:
+            raise UserFacingDownloadError("download_cancelled") from exc
         except DownloadError as exc:
             raise self.to_user_error(exc) from exc
+        finally:
+            self.cleanup_manual_cookie_files()
         progress("finished", 100, None)
 
     def build_yt_dlp_options(self, folder: str, hook: Callable[[dict], None], single: bool) -> dict:
@@ -135,6 +243,27 @@ class BaseDownloadService:
         if page_filter == "long":
             return lambda info, *args, **kwargs: self.reject_by_duration(info, min_seconds=181)
         return None
+
+    def build_cancelable_match_filter(
+        self,
+        platform_match_filter: Callable[[dict, bool], str | None] | None,
+        page_filter: str,
+        force: bool = False,
+    ) -> Callable[[dict, bool], str | None] | None:
+        duration_match_filter = self.build_match_filter(page_filter)
+        filters = [match_filter for match_filter in (platform_match_filter, duration_match_filter) if match_filter]
+        if not force and not filters and not self.is_cancel_requested():
+            return None
+
+        def match_filter(info: dict, *args, **kwargs) -> str | None:
+            self.raise_if_cancelled()
+            for active_filter in filters:
+                reason = active_filter(info, *args, **kwargs)
+                if reason:
+                    return reason
+            return None
+
+        return match_filter
 
     def reject_by_duration(
         self,

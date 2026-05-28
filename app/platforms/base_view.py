@@ -18,6 +18,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from yt_dlp.utils import DownloadCancelled
+
 from app.locales import translate
 from app.platforms.common import BaseDownloadService, PlatformConfig, UserFacingDownloadError
 from app.update_ui import ensure_update_allowed
@@ -34,6 +36,7 @@ class DownloadWorker(QObject):
         url: str,
         folder: str,
         page_filter: str,
+        cookie_header: str = "",
     ) -> None:
         super().__init__()
         self.service = service
@@ -41,16 +44,22 @@ class DownloadWorker(QObject):
         self.url = url
         self.folder = folder
         self.page_filter = page_filter
+        self.cookie_header = cookie_header
 
     def run(self) -> None:
         try:
+            self.service.set_manual_cookie_header(self.cookie_header)
             if self.mode == "single":
                 self.service.download_single(self.url, self.folder, self.emit_progress)
             else:
                 self.service.download_page(self.url, self.folder, self.emit_progress, self.page_filter)
             self.finished.emit(True, "")
+        except DownloadCancelled:
+            self.progress_changed.emit("download_cancelled", 0, {})
+            self.finished.emit(False, "download_cancelled")
         except UserFacingDownloadError as exc:
-            self.progress_changed.emit(exc.status_key, 100, exc.data)
+            percent = 0 if exc.status_key == "download_cancelled" else 100
+            self.progress_changed.emit(exc.status_key, percent, exc.data)
             self.finished.emit(False, str(exc))
         except Exception as exc:
             self.progress_changed.emit("download_failed", 100, {"error": str(exc)})
@@ -58,6 +67,9 @@ class DownloadWorker(QObject):
 
     def emit_progress(self, key: str, percent: int, data: dict[str, str] | None = None) -> None:
         self.progress_changed.emit(key, max(0, min(100, percent)), data or {})
+
+    def request_cancel(self) -> None:
+        self.service.request_cancel()
 
 
 class DownloadPanel(QFrame):
@@ -97,6 +109,19 @@ class DownloadPanel(QFrame):
         self.url_input.setMinimumHeight(42)
         layout.addWidget(self.url_input)
 
+        self.cookie_hint = QLabel()
+        self.cookie_hint.setObjectName("helperText")
+        self.cookie_hint.setWordWrap(True)
+        self.cookie_hint.setVisible(self.config.supports_manual_cookies)
+        layout.addWidget(self.cookie_hint)
+
+        self.cookie_input = QLineEdit()
+        self.cookie_input.setClearButtonEnabled(True)
+        self.cookie_input.setMinimumHeight(42)
+        self.cookie_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.cookie_input.setVisible(self.config.supports_manual_cookies)
+        layout.addWidget(self.cookie_input)
+
         self.page_filter_box = QComboBox()
         self.page_filter_box.setObjectName("filterCombo")
         self.page_filter_box.setMinimumHeight(42)
@@ -124,6 +149,14 @@ class DownloadPanel(QFrame):
 
         action_row = QHBoxLayout()
         action_row.addStretch(1)
+        self.cancel_btn = QPushButton()
+        self.cancel_btn.setObjectName("secondaryButton")
+        self.cancel_btn.setMinimumHeight(44)
+        self.cancel_btn.setVisible(self.mode == "page")
+        self.cancel_btn.setEnabled(False)
+        self.cancel_btn.clicked.connect(self.cancel_download)
+        action_row.addWidget(self.cancel_btn)
+
         self.download_btn = QPushButton()
         self.download_btn.setObjectName("primaryButton")
         self.download_btn.setMinimumHeight(44)
@@ -167,9 +200,12 @@ class DownloadPanel(QFrame):
         self.url_input.setPlaceholderText(
             self.config.example_video_url if is_single else self.config.example_page_url
         )
+        self.cookie_hint.setText(self.t("download.cookie_hint"))
+        self.cookie_input.setPlaceholderText(self.t("download.cookie_placeholder"))
         self.path_input.setPlaceholderText(self.t("download.folder_placeholder"))
         self.browse_btn.setText(self.t("download.choose_folder"))
         self.download_btn.setText(self.t("download.download"))
+        self.cancel_btn.setText(self.t("download.stop"))
         self.page_filter_box.setItemText(0, self.t("download.page_filter_short"))
         self.page_filter_box.setItemText(1, self.t("download.page_filter_long"))
         self.page_filter_box.setItemText(2, self.t("download.page_filter_all"))
@@ -209,11 +245,21 @@ class DownloadPanel(QFrame):
         self.status.setText(self.t("status.preparing"))
         self.download_btn.setEnabled(False)
         self.browse_btn.setEnabled(False)
+        self.cookie_input.setEnabled(False)
         self.page_filter_box.setEnabled(False)
+        self.cancel_btn.setEnabled(self.mode == "page")
 
         self.thread = QThread(self)
         page_filter = self.page_filter_box.currentData() if self.page_filter_box.isVisible() else "all"
-        self.worker = DownloadWorker(self.service_cls(), self.mode, url, self.save_path, str(page_filter))
+        cookie_header = self.cookie_input.text().strip() if self.cookie_input.isVisible() else ""
+        self.worker = DownloadWorker(
+            self.service_cls(),
+            self.mode,
+            url,
+            self.save_path,
+            str(page_filter),
+            cookie_header,
+        )
         self.worker.moveToThread(self.thread)
         self.thread.started.connect(self.worker.run)
         self.worker.progress_changed.connect(self.update_progress)
@@ -223,6 +269,13 @@ class DownloadPanel(QFrame):
         self.thread.finished.connect(self.thread.deleteLater)
         self.thread.start()
 
+    def cancel_download(self) -> None:
+        if not self.worker:
+            return
+        self.worker.request_cancel()
+        self.cancel_btn.setEnabled(False)
+        self.status.setText(self.t("status.cancelling"))
+
     def update_progress(self, key: str, percent: int, data: object) -> None:
         values = data if isinstance(data, dict) else {}
         self.progress.setValue(percent)
@@ -231,7 +284,9 @@ class DownloadPanel(QFrame):
     def finish_download(self, success: bool, error: str) -> None:
         self.download_btn.setEnabled(True)
         self.browse_btn.setEnabled(True)
+        self.cookie_input.setEnabled(True)
         self.page_filter_box.setEnabled(True)
+        self.cancel_btn.setEnabled(False)
         if success:
             self.progress.setValue(100)
             if self.status.text() != self.t("status.finished"):

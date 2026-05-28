@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import html as html_lib
 import os
 from pathlib import Path
+import re
 from typing import Callable
-from urllib.parse import urlparse
+from urllib.error import HTTPError, URLError
+from urllib.parse import parse_qs, urljoin, urlparse
+from urllib.request import Request, urlopen
 
+from yt_dlp.cookies import extract_cookies_from_browser
 from yt_dlp.utils import DownloadError
 
 from app.platforms.common import BaseDownloadService, PlatformConfig, ProgressCallback, UserFacingDownloadError
@@ -12,6 +17,15 @@ from app.platforms.common import BaseDownloadService, PlatformConfig, ProgressCa
 
 FACEBOOK_COMBINED_FORMAT = "b[ext=mp4]/b"
 FACEBOOK_SPLIT_FORMAT = "bv*[ext=mp4]+ba[ext=m4a]/bv*+ba/b[ext=mp4]/b"
+FACEBOOK_MAX_SCAN_PAGES = 40
+FACEBOOK_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/125.0.0.0 Safari/537.36"
+    ),
+    "Accept-Language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7",
+}
 FACEBOOK_BROWSER_COOKIE_PATHS = (
     ("firefox", ("APPDATA", "Mozilla", "Firefox", "Profiles")),
     ("edge", ("LOCALAPPDATA", "Microsoft", "Edge", "User Data")),
@@ -24,10 +38,39 @@ CONFIG = PlatformConfig(
     example_video_url="https://www.facebook.com/watch/?v=123456789",
     example_page_url="https://www.facebook.com/example.page",
     supports_page_filters=True,
+    supports_manual_cookies=True,
 )
 
 
 class FacebookService(BaseDownloadService):
+    def download_urls(
+        self,
+        urls: list[str],
+        folder: str,
+        progress: ProgressCallback,
+        single: bool,
+        page_filter: str,
+        emit_initial_progress: bool = True,
+    ) -> None:
+        self.use_browser_cookies = True
+        self.browser_cookie_failed = False
+        try:
+            super().download_urls(urls, folder, progress, single, page_filter, emit_initial_progress)
+        except UserFacingDownloadError as exc:
+            if exc.status_key != "facebook_cookie_failed":
+                raise
+            self.browser_cookie_failed = True
+            self.use_browser_cookies = False
+            try:
+                super().download_urls(urls, folder, progress, single, page_filter, emit_initial_progress)
+            except UserFacingDownloadError as retry_exc:
+                if retry_exc.status_key in {"facebook_parse_failed", "login_required"}:
+                    raise UserFacingDownloadError("facebook_cookie_unavailable") from retry_exc
+                raise
+        finally:
+            self.use_browser_cookies = True
+            self.browser_cookie_failed = False
+
     def download(
         self,
         url: str,
@@ -73,6 +116,8 @@ class FacebookService(BaseDownloadService):
         )
         if has_ffmpeg:
             options["merge_output_format"] = "mp4"
+        if self.apply_manual_cookies(options, (".facebook.com", ".fb.watch")):
+            return options
         if getattr(self, "use_browser_cookies", True):
             cookies_from_browser = self.find_browser_cookies()
             if cookies_from_browser:
@@ -95,7 +140,15 @@ class FacebookService(BaseDownloadService):
         normalized = url.lower()
         if "/people/" in normalized:
             raise UserFacingDownloadError("facebook_people_page")
-        super().download_page(url, folder, progress, page_filter)
+        if self.is_supported_video_url(url):
+            super().download_page(url, folder, progress, page_filter)
+            return
+
+        progress("reading", 18, None)
+        urls = self.collect_page_video_urls(url, progress)
+        if not urls:
+            raise UserFacingDownloadError("facebook_page_no_videos")
+        self.download_urls(urls, folder, progress, single=False, page_filter=page_filter, emit_initial_progress=False)
 
     def to_user_error(self, exc: DownloadError) -> UserFacingDownloadError:
         message = str(exc)
@@ -121,25 +174,226 @@ class FacebookService(BaseDownloadService):
         return url
 
     def is_supported_video_url(self, url: str) -> bool:
-        normalized = url.lower()
-        return any(
-            marker in normalized
-            for marker in (
-                "/watch",
-                "/video.php",
-                "/video/video.php",
-                "/videos/",
-                "/reel/",
-                "/share/v/",
-                "/share/r/",
-                "fb.watch/",
-                "/posts/",
-                "/permalink.php",
-                "/story.php",
-                "/groups/",
-                "/events/",
-            )
-        )
+        try:
+            parsed = urlparse(url)
+            host = (parsed.hostname or "").lower()
+            path_parts = [part.lower() for part in parsed.path.split("/") if part]
+            query = parse_qs(parsed.query)
+        except Exception:
+            return False
+
+        if "fb.watch" in host:
+            return bool(parsed.path.strip("/"))
+        if "facebook.com" not in host or not path_parts:
+            return False
+        if path_parts[0] == "watch":
+            return "v" in query or "video_id" in query
+        if path_parts[0] in {"video.php", "video"}:
+            return "v" in query or "video_id" in query
+        if path_parts[0] == "reel":
+            return len(path_parts) >= 2 and path_parts[1].isdigit()
+        if path_parts[0] == "share" and len(path_parts) >= 3:
+            return path_parts[1] in {"v", "r"}
+        if path_parts[0] in {"story.php", "permalink.php", "photo.php"}:
+            return bool({"story_fbid", "id", "fbid"} & set(query))
+        if "videos" in path_parts:
+            videos_index = path_parts.index("videos")
+            return len(path_parts) > videos_index + 1 and path_parts[videos_index + 1] != "all"
+        if "posts" in path_parts:
+            posts_index = path_parts.index("posts")
+            return len(path_parts) > posts_index + 1
+        if "permalink" in path_parts:
+            permalink_index = path_parts.index("permalink")
+            return len(path_parts) > permalink_index + 1
+        if path_parts[0] == "events":
+            return len(path_parts) >= 2
+        return False
+
+    def collect_page_video_urls(self, url: str, progress: ProgressCallback | None = None) -> list[str]:
+        scan_urls = self.build_page_scan_urls(url)
+        if not scan_urls:
+            raise UserFacingDownloadError("facebook_page_link")
+
+        urls: list[str] = []
+        seen_video_keys: set[str] = set()
+        seen_scan_urls: set[str] = set()
+        queue = list(scan_urls)
+        scan_count = 0
+        had_readable_page = False
+
+        while queue and scan_count < FACEBOOK_MAX_SCAN_PAGES:
+            self.raise_if_cancelled()
+            scan_url = queue.pop(0)
+            if scan_url in seen_scan_urls:
+                continue
+            seen_scan_urls.add(scan_url)
+            scan_count += 1
+
+            if progress:
+                progress("reading", min(45, 18 + scan_count), None)
+
+            try:
+                page_html = self.fetch_page_html(scan_url)
+            except UserFacingDownloadError:
+                continue
+            had_readable_page = True
+            decoded_html = self.decode_facebook_html(page_html)
+            self.add_video_urls_from_html(decoded_html, scan_url, urls, seen_video_keys)
+
+            for next_url in self.extract_next_scan_urls(decoded_html, scan_url):
+                if next_url not in seen_scan_urls and next_url not in queue:
+                    queue.append(next_url)
+
+        if not urls and not had_readable_page:
+            raise UserFacingDownloadError("facebook_page_failed")
+        return urls
+
+    def build_page_scan_urls(self, url: str) -> list[str]:
+        parsed = urlparse(url)
+        host = (parsed.hostname or "").lower()
+        path_parts = [part for part in parsed.path.split("/") if part]
+        if "facebook.com" not in host or not path_parts:
+            return []
+
+        first_part = path_parts[0].lower()
+        if first_part in {
+            "watch",
+            "video.php",
+            "story.php",
+            "permalink.php",
+            "photo.php",
+            "reel",
+            "share",
+            "groups",
+            "events",
+            "people",
+            "profile.php",
+        }:
+            return []
+
+        page_slug = path_parts[0]
+        return [
+            f"https://www.facebook.com/{page_slug}/videos",
+            f"https://www.facebook.com/{page_slug}/reels",
+            f"https://m.facebook.com/{page_slug}/videos",
+            f"https://m.facebook.com/{page_slug}/reels",
+            f"https://mbasic.facebook.com/{page_slug}/videos",
+            f"https://www.facebook.com/{page_slug}/",
+        ]
+
+    def fetch_page_html(self, url: str) -> str:
+        headers = dict(FACEBOOK_HEADERS)
+        cookie_header = self.get_manual_cookie_header() or self.get_browser_cookie_header(url)
+        if cookie_header:
+            headers["Cookie"] = cookie_header
+        request = Request(url, headers=headers)
+        try:
+            with urlopen(request, timeout=25) as response:
+                return response.read().decode("utf-8", errors="replace")
+        except (HTTPError, URLError, TimeoutError) as exc:
+            raise UserFacingDownloadError("facebook_page_failed") from exc
+
+    def get_browser_cookie_header(self, url: str) -> str | None:
+        if hasattr(self, "_browser_cookie_header"):
+            return self._browser_cookie_header
+
+        cookies_from_browser = self.find_browser_cookies()
+        if not cookies_from_browser:
+            self._browser_cookie_header = None
+            return None
+
+        browser = cookies_from_browser[0]
+        try:
+            cookie_header = extract_cookies_from_browser(browser).get_cookie_header(url)
+        except Exception as exc:
+            print(f"[Facebook] browser cookie unavailable from {browser}: {exc}")
+        else:
+            if cookie_header:
+                self._browser_cookie_header = cookie_header
+                return cookie_header
+
+        self._browser_cookie_header = None
+        return None
+
+    def decode_facebook_html(self, page_html: str) -> str:
+        return html_lib.unescape(page_html).replace("\\/", "/")
+
+    def add_video_urls_from_html(
+        self,
+        page_html: str,
+        base_url: str,
+        urls: list[str],
+        seen_video_keys: set[str],
+    ) -> None:
+        for href in re.findall(r'''(?i)\bhref=["']([^"']+)["']''', page_html):
+            self.add_video_url(urljoin(base_url, href), urls, seen_video_keys)
+        for direct_url in re.findall(r'''(?i)https?://(?:www\.|m\.)?facebook\.com/[^\s"'<>]+''', page_html):
+            self.add_video_url(direct_url, urls, seen_video_keys)
+        for video_id in re.findall(r'''(?i)["'](?:video_id|videoid|videoID)["']\s*[:=]\s*["']?(\d{5,})''', page_html):
+            self.add_watch_url(video_id, urls, seen_video_keys)
+        for video_id in re.findall(r'''(?i)(?:watch/\?v=|video\.php\?v=)(\d{5,})''', page_html):
+            self.add_watch_url(video_id, urls, seen_video_keys)
+        for video_id in re.findall(r'''(?i)/videos/(?:[^/?#]+/)?(\d{5,})''', page_html):
+            self.add_watch_url(video_id, urls, seen_video_keys)
+        for reel_id in re.findall(r'''(?i)/reel/(\d{5,})''', page_html):
+            self.add_reel_url(reel_id, urls, seen_video_keys)
+
+    def add_video_url(self, raw_url: str, urls: list[str], seen_video_keys: set[str]) -> None:
+        parsed = urlparse(raw_url)
+        host = (parsed.hostname or "").lower()
+        path_parts = [part for part in parsed.path.split("/") if part]
+        if "facebook.com" not in host or not path_parts:
+            return
+
+        query = parse_qs(parsed.query)
+        if path_parts[0].lower() == "watch" and query.get("v"):
+            self.add_watch_url(query["v"][0], urls, seen_video_keys)
+            return
+        if path_parts[0].lower() in {"video.php", "video"} and query.get("v"):
+            self.add_watch_url(query["v"][0], urls, seen_video_keys)
+            return
+        if path_parts[0].lower() == "reel" and len(path_parts) >= 2:
+            self.add_reel_url(path_parts[1], urls, seen_video_keys)
+            return
+        if "videos" in [part.lower() for part in path_parts]:
+            lower_parts = [part.lower() for part in path_parts]
+            videos_index = lower_parts.index("videos")
+            candidates = path_parts[videos_index + 1 : videos_index + 3]
+            for candidate in candidates:
+                if candidate.isdigit():
+                    self.add_watch_url(candidate, urls, seen_video_keys)
+                    break
+
+    def add_watch_url(self, video_id: str, urls: list[str], seen_video_keys: set[str]) -> None:
+        if not video_id.isdigit():
+            return
+        if video_id in seen_video_keys:
+            return
+        seen_video_keys.add(video_id)
+        urls.append(f"https://www.facebook.com/watch/?v={video_id}")
+
+    def add_reel_url(self, reel_id: str, urls: list[str], seen_video_keys: set[str]) -> None:
+        if not reel_id.isdigit():
+            return
+        if reel_id in seen_video_keys:
+            return
+        seen_video_keys.add(reel_id)
+        urls.append(f"https://www.facebook.com/reel/{reel_id}/")
+
+    def extract_next_scan_urls(self, page_html: str, base_url: str) -> list[str]:
+        next_urls: list[str] = []
+        for href in re.findall(r'''(?i)\bhref=["']([^"']+)["']''', page_html):
+            resolved = urljoin(base_url, href)
+            parsed = urlparse(resolved)
+            if "facebook.com" not in (parsed.hostname or "").lower():
+                continue
+            lowered = resolved.lower()
+            if ("/videos" not in lowered and "/reels" not in lowered) or not any(
+                token in lowered for token in ("cursor", "after", "pagelet", "more", "sk=videos")
+            ):
+                continue
+            next_urls.append(resolved)
+        return next_urls
 
     def find_browser_cookies(self) -> tuple[str, str | None, str | None, str | None] | None:
         for browser, path_parts in FACEBOOK_BROWSER_COOKIE_PATHS:
