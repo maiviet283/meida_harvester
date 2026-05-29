@@ -25,7 +25,7 @@ from typing import Literal
 from urllib import request as _urllib_req
 from urllib.error import HTTPError, URLError
 
-_API_BASE = "http://127.0.0.1:8000/licenses"
+_API_BASE = "https://course-finder-3v7y.onrender.com/licenses"
 _SIG_KEY = os.environ.get("CF_SIG_KEY", "cf-hmac-default-dev")
 _TIMEOUT = 10  # seconds
 _CACHE_DIR = Path(os.environ.get("APPDATA", Path.home())) / "ClipFlow"
