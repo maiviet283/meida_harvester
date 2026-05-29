@@ -1,4 +1,4 @@
-# ClipFlow Codex Guide
+# ClipFlow Claude Code
 
 ## Working Style
 
@@ -99,7 +99,7 @@ app/
 - `Tải video`: dán một link video bất kỳ, tải một video riêng lẻ, không phân biệt ngắn/dài.
 - `Tải cả trang`:
   - TikTok tải toàn bộ trang/profile theo link; post ảnh/slideshow không có video track sẽ bị bỏ qua để batch tiếp tục chạy.
-  - Instagram tải toàn bộ trang/profile bằng API profile/clips/feed riêng để né extractor `instagram:user` đang broken trong `yt-dlp`; API clips dùng mobile endpoint với `target_user_id` để gom Reels. Nếu feed pagination bị Instagram chặn tạm thì vẫn tải các video đã lấy được từ profile/clips API. Không có lựa chọn ngắn/dài vì Instagram chỉ xử lý short video; post ảnh/carousel không có video track và post bị giới hạn audience sẽ bị bỏ qua để batch tiếp tục chạy. Instagram ưu tiên MP4 Full HD tối đa 1920px ở mỗi chiều để giữ đúng 1080x1920/1920x1080, với video H.264 và audio AAC/M4A. Instagram ưu tiên cookie người dùng dán trong UI; nếu không có thì thử cookie Firefox/Edge/Chrome cho cả API profile/clips/feed lẫn lượt tải `yt-dlp`; nếu đọc cookie browser lỗi DPAPI thì retry không dùng cookie.
+  - Instagram tải toàn bộ trang/profile bằng API profile/feed riêng để né extractor `instagram:user` đang broken trong `yt-dlp`; nếu feed pagination bị Instagram chặn tạm thì vẫn tải các video đã lấy được từ profile API. Không có lựa chọn ngắn/dài vì Instagram chỉ xử lý short video; post ảnh/carousel không có video track và post bị giới hạn audience sẽ bị bỏ qua để batch tiếp tục chạy. Instagram ưu tiên MP4 Full HD tối đa 1920px ở mỗi chiều để giữ đúng 1080x1920/1920x1080, với video H.264 và audio AAC/M4A. Instagram ưu tiên cookie người dùng dán trong UI; nếu không có thì thử cookie Firefox/Edge/Chrome cho cả API profile/feed lẫn lượt tải `yt-dlp`; nếu đọc cookie browser lỗi DPAPI thì retry không dùng cookie.
   - Facebook, YouTube có lựa chọn:
     - Tải video ngắn toàn trang.
     - Tải video dài toàn trang.

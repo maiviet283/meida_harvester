@@ -22,7 +22,9 @@ INSTAGRAM_COMBINED_MP4_FORMATS = (
     "b[ext=mp4][width<=1920][height<=1920][vcodec!=none][acodec!=none]",
 )
 INSTAGRAM_FALLBACK_VIDEO_FORMATS = (
+    "b[ext=mp4][width<=1920][height<=1920][vcodec!=none]",
     "b[width<=1920][height<=1920][vcodec!=none][acodec!=none]",
+    "b[ext=mp4][vcodec!=none]",
     "b[vcodec!=none][acodec!=none]",
 )
 INSTAGRAM_FALLBACK_SPLIT_FORMATS = (
@@ -30,7 +32,9 @@ INSTAGRAM_FALLBACK_SPLIT_FORMATS = (
     "bv*[vcodec!=none]+ba",
 )
 INSTAGRAM_FEED_PAGE_SIZE = 12
+INSTAGRAM_CLIPS_PAGE_SIZE = 50
 INSTAGRAM_MAX_FEED_PAGES = 120
+INSTAGRAM_CLIPS_API_URL = "https://i.instagram.com/api/v1/clips/user/"
 INSTAGRAM_WEB_HEADERS = {
     "Accept": "application/json,text/plain,*/*",
     "Referer": "https://www.instagram.com/",
@@ -130,7 +134,9 @@ class InstagramService(BaseDownloadService):
         if has_ffmpeg:
             options["merge_output_format"] = "mp4"
         if not single:
+            options["noplaylist"] = True
             options["ignoreerrors"] = True
+            options["ignore_no_formats_error"] = True
             options["match_filter"] = self.reject_non_video_post
         if self.apply_manual_cookies(options, (".instagram.com",)):
             return options
@@ -176,12 +182,16 @@ class InstagramService(BaseDownloadService):
         seen_shortcodes: set[str] = set()
         self.add_profile_edges(user, urls, seen_shortcodes)
 
+        if progress:
+            progress("reading", 22, None)
+        self.collect_clips_urls(user_id, urls, seen_shortcodes)
+
         max_id: str | None = None
         seen_cursors: set[str] = set()
         for page in range(INSTAGRAM_MAX_FEED_PAGES):
             self.raise_if_cancelled()
             if progress:
-                progress("reading", min(40, 18 + page), None)
+                progress("reading", min(85, 30 + page), None)
 
             params = {"count": str(INSTAGRAM_FEED_PAGE_SIZE)}
             if max_id:
@@ -210,18 +220,86 @@ class InstagramService(BaseDownloadService):
 
         return urls
 
+    def collect_clips_urls(self, user_id: str, urls: list[str], seen_shortcodes: set[str]) -> None:
+        max_id: str | None = None
+        seen_cursors: set[str] = set()
+        for _page in range(INSTAGRAM_MAX_FEED_PAGES):
+            self.raise_if_cancelled()
+            try:
+                response = self.fetch_clips_page(user_id, max_id)
+            except UserFacingDownloadError:
+                break
+
+            for item in response.get("items") or []:
+                media = item.get("media") if isinstance(item.get("media"), dict) else item
+                if self.feed_item_has_video(media):
+                    self.add_shortcode_url(
+                        media.get("code"),
+                        urls,
+                        seen_shortcodes,
+                        media.get("product_type") or "clips",
+                    )
+
+            paging = response.get("paging_info") or {}
+            next_max_id = paging.get("max_id")
+            if not paging.get("more_available") or not next_max_id:
+                break
+            if str(next_max_id) in seen_cursors:
+                break
+            seen_cursors.add(str(next_max_id))
+            max_id = str(next_max_id)
+
+    def fetch_clips_page(self, user_id: str, max_id: str | None = None) -> dict:
+        params: dict[str, str] = {
+            "target_user_id": user_id,
+            "include_feed_video": "true",
+            "page_size": str(INSTAGRAM_CLIPS_PAGE_SIZE),
+        }
+        if max_id:
+            params["max_id"] = max_id
+
+        data = urlencode(params).encode("utf-8")
+        active_headers = {
+            **INSTAGRAM_MOBILE_HEADERS,
+            "Content-Type": "application/x-www-form-urlencoded",
+        }
+        manual_cookie = self.get_manual_cookie_header()
+        if manual_cookie:
+            active_headers["Cookie"] = manual_cookie
+        else:
+            browser_cookie = self.get_browser_cookie_header("https://www.instagram.com/")
+            if browser_cookie:
+                active_headers["Cookie"] = browser_cookie
+
+        try:
+            request = Request(
+                INSTAGRAM_CLIPS_API_URL,
+                data=data,
+                headers=active_headers,
+            )
+            with urlopen(request, timeout=25) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
+            raise UserFacingDownloadError("instagram_profile_failed") from exc
+
     def fetch_json(self, url: str, headers: dict[str, str] | None = None) -> dict:
         self.raise_if_cancelled()
         active_headers = dict(headers or INSTAGRAM_WEB_HEADERS)
         manual_cookie_header = self.get_manual_cookie_header()
         if manual_cookie_header:
             active_headers["Cookie"] = manual_cookie_header
+        elif not active_headers.get("Cookie"):
+            browser_cookie = self.get_browser_cookie_header(url)
+            if browser_cookie:
+                active_headers["Cookie"] = browser_cookie
         try:
             response = self.open_json(url, active_headers)
             self.raise_if_cancelled()
             return response
         except HTTPError as exc:
             if exc.code not in {401, 403}:
+                raise UserFacingDownloadError("instagram_profile_failed") from exc
+            if active_headers.get("Cookie"):
                 raise UserFacingDownloadError("instagram_profile_failed") from exc
             cookie_header = self.get_browser_cookie_header(url)
             if not cookie_header:
@@ -281,6 +359,8 @@ class InstagramService(BaseDownloadService):
                     self.add_shortcode_url(node.get("shortcode"), urls, seen_shortcodes, node.get("product_type"))
 
     def profile_node_has_video(self, node: dict) -> bool:
+        if self.is_clip_product(node.get("product_type")):
+            return True
         if node.get("is_video"):
             return True
         if node.get("__typename") == "GraphVideo":
@@ -297,7 +377,7 @@ class InstagramService(BaseDownloadService):
             return True
         if item.get("video_versions"):
             return True
-        if item.get("product_type") == "clips":
+        if self.is_clip_product(item.get("product_type")):
             return True
         return any((child.get("media_type") == 2 or child.get("video_versions")) for child in item.get("carousel_media") or [])
 
@@ -312,11 +392,28 @@ class InstagramService(BaseDownloadService):
             return
         shortcode_text = shortcode.strip()
         shortcode_key = shortcode_text.lower()
-        if not shortcode_text or shortcode_key in seen_shortcodes:
+        if not shortcode_text:
+            return
+        path = "reel" if self.is_clip_product(product_type) else "p"
+        url = f"https://www.instagram.com/{path}/{shortcode_text}/"
+        if shortcode_key in seen_shortcodes:
+            if path == "reel":
+                self.prefer_reel_url(shortcode_text, url, urls)
             return
         seen_shortcodes.add(shortcode_key)
-        path = "reel" if product_type == "clips" else "p"
-        urls.append(f"https://www.instagram.com/{path}/{shortcode_text}/")
+        urls.append(url)
+
+    def is_clip_product(self, product_type: object) -> bool:
+        return isinstance(product_type, str) and product_type.lower() in {"clip", "clips", "reel", "reels"}
+
+    def prefer_reel_url(self, shortcode: str, reel_url: str, urls: list[str]) -> None:
+        shortcode_key = shortcode.lower()
+        for index, existing_url in enumerate(urls):
+            parsed = urlparse(existing_url)
+            path_parts = [part for part in parsed.path.split("/") if part]
+            if len(path_parts) >= 2 and path_parts[0].lower() == "p" and path_parts[1].lower() == shortcode_key:
+                urls[index] = reel_url
+                return
 
     def reject_non_video_post(self, info: dict, *args, **kwargs) -> str | None:
         if kwargs.get("incomplete"):

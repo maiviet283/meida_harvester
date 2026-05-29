@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import unittest
 from unittest.mock import patch
+from urllib.parse import parse_qs
 
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError
@@ -65,13 +66,25 @@ class InstagramServiceTest(unittest.TestCase):
             "more_available": False,
         }
 
-        with patch.object(service, "fetch_json", side_effect=[profile, first_page, second_page]):
+        clips_page = {
+            "items": [
+                {"media": {"code": "OLD1", "media_type": 2, "product_type": "clips"}},
+                {"media": {"code": "CLIP1", "video_versions": [{"url": "https://example.com/clip.mp4"}]}},
+                {"media": {"code": "PHOTO_CLIP", "media_type": 1}},
+            ],
+            "paging_info": {"more_available": False},
+        }
+
+        with patch.object(service, "fetch_json", side_effect=[profile, first_page, second_page]), patch.object(
+            service, "fetch_clips_page", return_value=clips_page
+        ):
             urls = service.collect_profile_video_urls("https://www.instagram.com/creator/")
 
         self.assertEqual(
             urls,
             [
-                "https://www.instagram.com/p/OLD1/",
+                "https://www.instagram.com/reel/OLD1/",
+                "https://www.instagram.com/reel/CLIP1/",
                 "https://www.instagram.com/reel/NEW1/",
                 "https://www.instagram.com/p/NEW2/",
                 "https://www.instagram.com/p/NEW3/",
@@ -108,10 +121,52 @@ class InstagramServiceTest(unittest.TestCase):
             }
         }
 
-        with patch.object(service, "fetch_json", side_effect=[profile, UserFacingDownloadError("instagram_profile_failed")]):
+        with patch.object(
+            service,
+            "fetch_json",
+            side_effect=[profile, UserFacingDownloadError("instagram_profile_failed")],
+        ), patch.object(
+            service,
+            "fetch_clips_page",
+            side_effect=UserFacingDownloadError("instagram_profile_failed"),
+        ):
             urls = service.collect_profile_video_urls("https://www.instagram.com/creator/")
 
         self.assertEqual(urls, ["https://www.instagram.com/p/OLD1/"])
+
+    def test_clips_api_uses_mobile_target_user_id_request(self) -> None:
+        service = InstagramService()
+        captured_requests = []
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def read(self) -> bytes:
+                return b'{"items": [], "paging_info": {"more_available": false}}'
+
+        def fake_urlopen(request, timeout):
+            captured_requests.append(request)
+            self.assertEqual(timeout, 25)
+            return FakeResponse()
+
+        with patch.object(service, "get_browser_cookie_header", return_value=None), patch(
+            "app.platforms.instagram.service.urlopen",
+            fake_urlopen,
+        ):
+            response = service.fetch_clips_page("123", "cursor-1")
+
+        request = captured_requests[0]
+        params = parse_qs(request.data.decode("utf-8"))
+        self.assertEqual(request.full_url, "https://i.instagram.com/api/v1/clips/user/")
+        self.assertEqual(params["target_user_id"], ["123"])
+        self.assertNotIn("user_id", params)
+        self.assertEqual(params["max_id"], ["cursor-1"])
+        self.assertIn("Instagram 219.0.0.12.117 Android", request.get_header("User-agent"))
+        self.assertEqual(response["items"], [])
 
     def test_options_prioritize_full_hd_mp4_and_skip_non_video_posts(self) -> None:
         service = InstagramService()
@@ -123,8 +178,10 @@ class InstagramServiceTest(unittest.TestCase):
 
         self.assertEqual(options["merge_output_format"], "mp4")
         self.assertIs(options["ignoreerrors"], True)
+        self.assertIs(options["ignore_no_formats_error"], True)
         self.assertIn("width<=1920][height<=1920", options["format"])
         self.assertIn("ba[ext=m4a]", options["format"])
+        self.assertIn("b[ext=mp4][width<=1920][height<=1920][vcodec!=none]", options["format"])
         self.assertEqual(options["format_sort"][0], "quality")
 
         match_filter = options["match_filter"]
