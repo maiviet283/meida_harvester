@@ -164,7 +164,9 @@ app/
 - Khi thêm nền tảng mới, tạo folder riêng trong `app/platforms/<platform>/`.
 - Mỗi nền tảng phải có `service.py` và `views.py`.
 - Thêm nền tảng mới vào `app/platforms/registry.py`.
-- Khi thêm text UI mới, cập nhật cả `vi.py` và `en.py`.
+- **TUYỆT ĐỐI KHÔNG hard-code bất kỳ chuỗi UI nào** (button, label, title, hint, message, placeholder...). Mọi text hiển thị cho người dùng phải lấy qua `self.t("key")` / `translate(lang, "key")` từ `vi.py` và `en.py`.
+- Khi thêm text UI mới: thêm key vào **cả hai** `vi.py` và `en.py` trước, rồi mới dùng trong code.
+- Không dùng chuỗi tiếng Anh hoặc tiếng Việt trực tiếp trong `setText()`, `setPlaceholderText()`, `setWindowTitle()`, `addButton()`, hay bất kỳ widget nào — trừ `objectName()` (dùng cho CSS) và giá trị kỹ thuật không phải UI.
 - Khi thêm màu hoặc style state mới, cập nhật `app/themes.py`.
 - Không thêm comment thừa. Chỉ comment khi logic thật sự khó hiểu.
-- Không hard-code URL, màu, text trong file view.
+- Không hard-code URL, màu trong file view.

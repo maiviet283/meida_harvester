@@ -21,6 +21,7 @@ class PlatformConfig:
     example_page_url: str
     supports_page_filters: bool = False
     supports_manual_cookies: bool = False
+    supports_analysis: bool = False
 
 
 class UserFacingDownloadError(Exception):

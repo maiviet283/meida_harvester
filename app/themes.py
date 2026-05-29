@@ -304,4 +304,99 @@ def build_stylesheet(theme_name: str) -> str:
         QMessageBox QPushButton:hover {{
             background: {theme["secondary_hover"]};
         }}
+        QFrame#channelCard {{
+            background: {theme["surface_alt"]};
+            border: 1px solid {theme["line"]};
+            border-left: 3px solid {theme["primary"]};
+            border-radius: 6px;
+        }}
+        QLabel#channelName {{
+            color: {theme["text"]};
+            font-size: 14px;
+            font-weight: 700;
+        }}
+        QLabel#channelBio {{
+            color: {theme["muted"]};
+            font-size: 13px;
+        }}
+        QLabel#overviewInfo {{
+            color: {theme["muted"]};
+            font-size: 13px;
+        }}
+        QLabel#hashtagInfo {{
+            color: {theme["primary"]};
+            font-size: 13px;
+        }}
+        QTableWidget#analysisTable {{
+            background: {theme["surface"]};
+            color: {theme["text"]};
+            gridline-color: {theme["line"]};
+            border: 1px solid {theme["line"]};
+            border-radius: 6px;
+            outline: 0;
+            font-size: 13px;
+        }}
+        QTableWidget#analysisTable::item {{
+            padding: 5px 10px;
+            border: 0;
+            color: {theme["text"]};
+        }}
+        QTableWidget#analysisTable::item:selected {{
+            background: {theme["primary"]};
+            color: {theme["primary_text"]};
+        }}
+        QTableWidget#analysisTable::item:alternate {{
+            background: {theme["surface_alt"]};
+        }}
+        QTableWidget#analysisTable::item:alternate:selected {{
+            background: {theme["primary"]};
+            color: {theme["primary_text"]};
+        }}
+        QHeaderView::section {{
+            background: {theme["secondary"]};
+            color: {theme["text"]};
+            padding: 7px 10px;
+            border: 0;
+            border-right: 1px solid {theme["line"]};
+            border-bottom: 1px solid {theme["line"]};
+            font-weight: 700;
+            font-size: 13px;
+        }}
+        QHeaderView::section:hover {{
+            background: {theme["secondary_hover"]};
+        }}
+        QScrollBar:vertical {{
+            background: {theme["surface"]};
+            width: 8px;
+            border-radius: 4px;
+            margin: 0;
+        }}
+        QScrollBar::handle:vertical {{
+            background: {theme["subtle"]};
+            border-radius: 4px;
+            min-height: 24px;
+        }}
+        QScrollBar::handle:vertical:hover {{
+            background: {theme["muted"]};
+        }}
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+            height: 0;
+        }}
+        QScrollBar:horizontal {{
+            background: {theme["surface"]};
+            height: 8px;
+            border-radius: 4px;
+            margin: 0;
+        }}
+        QScrollBar::handle:horizontal {{
+            background: {theme["subtle"]};
+            border-radius: 4px;
+            min-width: 24px;
+        }}
+        QScrollBar::handle:horizontal:hover {{
+            background: {theme["muted"]};
+        }}
+        QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
+            width: 0;
+        }}
     """
