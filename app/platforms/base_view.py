@@ -23,6 +23,7 @@ from yt_dlp.utils import DownloadCancelled
 from app.cookie_store import get_cookie_store
 from app.locales import translate
 from app.platforms.common import BaseDownloadService, PlatformConfig, UserFacingDownloadError
+from app.license_gate_ui import ensure_license_allowed
 from app.update_ui import ensure_update_allowed
 
 
@@ -239,6 +240,8 @@ class DownloadPanel(QFrame):
             self.choose_folder()
             if not self.save_path:
                 return
+        if not ensure_license_allowed():
+            return
         if not ensure_update_allowed(self.language_getter()):
             return
 
