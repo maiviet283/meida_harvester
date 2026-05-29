@@ -242,6 +242,10 @@ def main() -> None:
     if not guard.is_primary:
         sys.exit(0)
 
+    from app.license_gate_ui import ensure_license_allowed
+    if not ensure_license_allowed():
+        sys.exit(0)
+
     if not ensure_update_allowed("vi"):
         sys.exit(0)
 
