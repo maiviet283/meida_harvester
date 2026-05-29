@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
 
 from app.locales import translate
 from app.platforms.registry import PLATFORM_MODULES
+from app.single_instance import SingleInstanceGuard
 from app.themes import build_stylesheet, get_theme
 from app.update_ui import ensure_update_allowed
 
@@ -207,8 +208,15 @@ class MainWindow(QMainWindow):
 def main() -> None:
     app = QApplication(sys.argv)
     app.setFont(QFont("Segoe UI", 10))
+
+    guard = SingleInstanceGuard()
+    if not guard.is_primary:
+        sys.exit(0)
+
     if not ensure_update_allowed("vi"):
         sys.exit(0)
+
     window = MainWindow()
+    guard.bind_window(window)
     window.showMaximized()
     sys.exit(app.exec())
