@@ -55,6 +55,7 @@ def main() -> int:
             print("[build] skipped by --no-build", flush=True)
             return 0
 
+        ensure_icon(python)
         ensure_pyinstaller(python)
         run_step(
             [
@@ -142,6 +143,14 @@ def write_update_manifest(version: str) -> None:
         json.dumps(content, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
+
+
+def ensure_icon(python: Path) -> None:
+    icon_path = ROOT / "assets" / "icon.ico"
+    if icon_path.exists():
+        return
+    print("[icon] assets/icon.ico not found — generating...", flush=True)
+    run_step([str(python), str(ROOT / "generate_icon.py")], "Generate icon")
 
 
 def ensure_pyinstaller(python: Path) -> None:
