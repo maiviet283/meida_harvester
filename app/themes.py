@@ -272,6 +272,19 @@ def build_stylesheet(theme_name: str) -> str:
         QPushButton#toolbarButton:hover {{
             background: {theme["secondary"]};
         }}
+        QPushButton#sidebarUpdateButton {{
+            background: transparent;
+            color: {theme["sidebar_muted"]};
+            border: 1px solid {theme["sidebar_border"]};
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: 12px;
+            font-weight: 600;
+        }}
+        QPushButton#sidebarUpdateButton:hover {{
+            background: {theme["sidebar_hover"]};
+            color: {theme["sidebar_text"]};
+        }}
         QMessageBox {{
             background: {theme["dialog_bg"]};
             color: {theme["dialog_text"]};

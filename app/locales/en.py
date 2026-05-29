@@ -3,7 +3,7 @@ TEXT = {
         "title": "ClipFlow - Media Downloader",
         "brand": "ClipFlow",
         "subtitle": "Universal media downloader",
-        "phase": "Ready to download media",
+        "check_update": "Updates",
         "theme_light": "Light",
         "theme_dark": "Dark",
         "language_vi": "VI",
@@ -117,5 +117,7 @@ TEXT = {
         "check_failed_message": "ClipFlow must verify the latest version before running. Check your network connection, then open the app again.\n\nDetails: {error}",
         "dev_mode_title": "Self-update unavailable",
         "dev_mode_message": "Self-update only works in packaged .exe builds. When running from Python source, update with git or rebuild the app.",
+        "up_to_date_title": "You're up to date",
+        "up_to_date_message": "ClipFlow {version} is the latest version.",
     },
 }

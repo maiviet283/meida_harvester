@@ -4,21 +4,46 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication, QMessageBox, QProgressDialog
 
 from app.locales import translate
-from app.updater import UpdateError, check_for_update, download_update, is_packaged_app, start_self_update
+from app.updater import UpdateCheck, UpdateError, check_for_update, download_update, is_packaged_app, start_self_update
 from app.version import APP_VERSION
 
 
-def ensure_update_allowed(language: str) -> bool:
+def trigger_update_check(language: str) -> None:
+    """Kiểm tra cập nhật thủ công khi user nhấn nút. Không chặn nếu không có update."""
     try:
         update_check = check_for_update()
     except UpdateError as exc:
-        QMessageBox.critical(
+        QMessageBox.warning(
             None,
             translate(language, "update.check_failed_title"),
             translate(language, "update.check_failed_message", error=str(exc)),
         )
-        return False
+        return
 
+    if not update_check.available and not update_check.required:
+        QMessageBox.information(
+            None,
+            translate(language, "update.up_to_date_title"),
+            translate(language, "update.up_to_date_message", version=APP_VERSION),
+        )
+        return
+
+    ensure_update_allowed(language, update_check)
+
+
+def ensure_update_allowed(language: str, _prefetched: UpdateCheck | None = None) -> bool:
+    if _prefetched is None:
+        try:
+            _prefetched = check_for_update()
+        except UpdateError as exc:
+            QMessageBox.critical(
+                None,
+                translate(language, "update.check_failed_title"),
+                translate(language, "update.check_failed_message", error=str(exc)),
+            )
+            return False
+
+    update_check = _prefetched
     if not update_check.available and not update_check.required:
         return True
 

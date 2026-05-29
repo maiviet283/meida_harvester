@@ -24,7 +24,8 @@ from app.locales import translate
 from app.platforms.registry import PLATFORM_MODULES
 from app.single_instance import SingleInstanceGuard
 from app.themes import build_stylesheet, get_theme
-from app.update_ui import ensure_update_allowed
+from app.update_ui import ensure_update_allowed, trigger_update_check
+from app.version import APP_VERSION
 
 
 class MainWindow(QMainWindow):
@@ -81,9 +82,21 @@ class MainWindow(QMainWindow):
         self.menu.currentRowChanged.connect(self.change_platform)
         sidebar_layout.addWidget(self.menu, 1)
 
+        footer_row = QHBoxLayout()
+        footer_row.setSpacing(8)
+        footer_row.setContentsMargins(0, 0, 0, 0)
+
         self.footer = QLabel()
         self.footer.setObjectName("sidebarFooter")
-        sidebar_layout.addWidget(self.footer)
+        footer_row.addWidget(self.footer, 1)
+
+        self.update_btn = QPushButton()
+        self.update_btn.setObjectName("sidebarUpdateButton")
+        self.update_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.update_btn.clicked.connect(self.check_for_updates)
+        footer_row.addWidget(self.update_btn)
+
+        sidebar_layout.addLayout(footer_row)
 
         content = QWidget()
         content_layout = QVBoxLayout(content)
@@ -134,6 +147,9 @@ class MainWindow(QMainWindow):
         if row >= 0:
             self.pages.setCurrentIndex(row)
 
+    def check_for_updates(self) -> None:
+        trigger_update_check(self.language)
+
     def toggle_theme(self) -> None:
         self.theme_name = "dark" if self.theme_name == "light" else "light"
         self.apply_theme()
@@ -147,7 +163,8 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(self.t("app.title"))
         self.brand.setText(self.t("app.brand"))
         self.subtitle.setText(self.t("app.subtitle"))
-        self.footer.setText(self.t("app.phase"))
+        self.footer.setText(f"ClipFlow {APP_VERSION}")
+        self.update_btn.setText(self.t("app.check_update"))
         self.theme_btn.setText(
             self.t("app.theme_dark") if self.theme_name == "light" else self.t("app.theme_light")
         )

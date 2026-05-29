@@ -3,7 +3,7 @@ TEXT = {
         "title": "ClipFlow - Trình tải media",
         "brand": "ClipFlow",
         "subtitle": "Trình tải media đa nền tảng",
-        "phase": "Sẵn sàng tải media",
+        "check_update": "Cập nhật",
         "theme_light": "Sáng",
         "theme_dark": "Tối",
         "language_vi": "VI",
@@ -117,5 +117,7 @@ TEXT = {
         "check_failed_message": "ClipFlow cần kiểm tra bản mới nhất trước khi chạy. Hãy kiểm tra kết nối mạng rồi mở lại app.\n\nChi tiết: {error}",
         "dev_mode_title": "Chưa thể tự cập nhật",
         "dev_mode_message": "Tự cập nhật chỉ chạy trên bản .exe đã build. Khi chạy source bằng Python, hãy cập nhật bằng git hoặc build lại app.",
+        "up_to_date_title": "Đang dùng bản mới nhất",
+        "up_to_date_message": "ClipFlow {version} là phiên bản mới nhất.",
     },
 }
