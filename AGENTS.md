@@ -45,6 +45,7 @@
 
 ```text
 app/
+|-- cookie_store.py
 |-- main_window.py
 |-- updater.py
 |-- update_ui.py
@@ -81,7 +82,7 @@ app/
 - Có nút đổi sáng/tối và nút đổi Việt/Anh.
 - Dialog thoát dùng text từ locale và màu từ theme.
 - Tab `Tải video` / `Tải cả trang` dùng style dạng pill/segmented control.
-- Facebook và Instagram có ô dán cookie đăng nhập, ẩn nội dung nhập và chỉ dùng cho lượt tải hiện tại.
+- Facebook và Instagram có ô dán cookie đăng nhập, ẩn nội dung nhập, nút hướng dẫn lấy cookie bằng CookiePeek nằm bên phải cùng hàng với tab `Tải video` / `Tải cả trang`, tự đồng bộ cookie giữa hai tab, rồi lưu lại trên máy local để dùng cho các lượt tải sau.
 - Tab `Tải cả trang` của mọi nền tảng có nút `Dừng` khi đang tải.
 - Không hiển thị thông tin giả trên trang nền tảng.
 - Khu vực tải dùng progress bar và status text thân thiện, không hiển thị log kỹ thuật cho người dùng.
@@ -90,9 +91,9 @@ app/
 
 - Tất cả nền tảng dùng `yt-dlp` qua service riêng.
 - Lỗi từ `yt-dlp` phải được map sang `UserFacingDownloadError` trong `app/platforms/common.py`, không để raw error kỹ thuật tràn ra UI.
-- `BaseDownloadService` chỉ giữ vòng đời tải chung: tạo thư mục, progress hook, gọi `yt-dlp`, map lỗi, helper FFmpeg và lọc duration.
+- `BaseDownloadService` chỉ giữ vòng đời tải chung: tạo thư mục, progress hook, gọi `yt-dlp`, map lỗi, helper FFmpeg và helper lọc duration.
 - `BaseDownloadService` giữ cờ hủy tải chung; nút `Dừng` gọi service cancel, progress hook/match filter sẽ raise `DownloadCancelled` rồi map sang `download_cancelled`.
-- Cookie người dùng dán trong UI chỉ dùng trong lượt tải hiện tại; service chuyển thành file cookies tạm format Netscape cho `yt-dlp`, rồi xóa sau khi tải xong.
+- Cookie người dùng dán trong UI được lưu bởi `app/cookie_store.py` theo từng nền tảng trong app data local của user; trên Windows ưu tiên bọc bằng DPAPI trước khi ghi file. Khi tải, service vẫn chuyển cookie đã lưu thành file cookies tạm format Netscape cho `yt-dlp`, rồi xóa file tạm sau khi tải xong.
 - Mỗi nền tảng tự định nghĩa `build_yt_dlp_options()` trong `app/platforms/<platform>/service.py`; không đặt format/codec policy theo nền tảng trong base.
 - TikTok đang ưu tiên MP4 tương thích trình phát phổ biến: video H.264 và audio AAC; nếu là video thật thì fallback sang format video khác để không bỏ sót, và chỉ dùng stream video/audio tách rời khi tìm thấy FFmpeg.
 - YouTube yêu cầu FFmpeg để tải chất lượng cao vì video/audio thường nằm ở stream tách rời; không fallback thầm về stream gộp sẵn 360p/480p, không ép `player_client`, và ưu tiên audio M4A/AAC để file MP4 phát có tiếng ổn định.
@@ -100,22 +101,16 @@ app/
 - `Tải cả trang`:
   - TikTok tải toàn bộ trang/profile theo link; post ảnh/slideshow không có video track sẽ bị bỏ qua để batch tiếp tục chạy.
   - Instagram tải toàn bộ trang/profile bằng API profile/clips/feed riêng để né extractor `instagram:user` đang broken trong `yt-dlp`; API clips dùng mobile endpoint với `target_user_id` để gom Reels. Nếu feed pagination bị Instagram chặn tạm thì vẫn tải các video đã lấy được từ profile/clips API. Không có lựa chọn ngắn/dài vì Instagram chỉ xử lý short video; post ảnh/carousel không có video track và post bị giới hạn audience sẽ bị bỏ qua để batch tiếp tục chạy. Instagram ưu tiên MP4 Full HD tối đa 1920px ở mỗi chiều để giữ đúng 1080x1920/1920x1080, với video H.264 và audio AAC/M4A. Instagram ưu tiên cookie người dùng dán trong UI; nếu không có thì thử cookie Firefox/Edge/Chrome cho cả API profile/clips/feed lẫn lượt tải `yt-dlp`; nếu đọc cookie browser lỗi DPAPI thì retry không dùng cookie.
-  - Facebook, YouTube có lựa chọn:
-    - Tải video ngắn toàn trang.
-    - Tải video dài toàn trang.
-    - Tải cả video ngắn và dài toàn trang.
-  - Mặc định là tải video ngắn toàn trang.
+  - Facebook và YouTube không còn lựa chọn ngắn/dài; tải toàn trang là tải toàn bộ video gom được.
 - Facebook:
   - Tải toàn trang Facebook dạng `facebook.com/<page>` tự quét HTML của trang/videos/reels để gom link `watch`/`reel` riêng lẻ trước khi gọi `yt-dlp`, vì `yt-dlp` không có extractor ổn định cho profile/page trần.
   - Link `/people/...` không tải toàn trang ổn định bằng `yt-dlp`, đang được chặn sớm và hiển thị hướng dẫn người dùng.
   - Tải 1 video Facebook ưu tiên link dạng `watch`, `video.php`, `videos`, `reel`, `share/v`, `share/r`, `story.php`, `permalink.php`, `posts`, `groups`, hoặc `fb.watch`.
   - Facebook service tự dùng cookie từ Firefox/Edge/Chrome nếu tìm thấy profile browser để giảm lỗi login/anti-bot.
-  - Nếu người dùng dán cookie trong UI thì Facebook ưu tiên cookie đó thay cho cookie tự đọc từ browser, chỉ dùng trong lượt tải hiện tại.
+  - Nếu người dùng dán cookie trong UI thì Facebook ưu tiên cookie đã lưu đó thay cho cookie tự đọc từ browser.
   - Nếu đọc cookie browser lỗi DPAPI, service tự retry không dùng cookie; nếu link vẫn không tải công khai được thì báo lỗi cookie thân thiện.
   - Link `share/r/<id>` và `share/v/<id>` có ID số được normalize sang `reel/<id>` hoặc `watch/?v=<id>` trước khi tải.
-- Quy ước lọc duration hiện tại:
-  - Video ngắn: `duration <= 180` giây.
-  - Video dài: `duration >= 181` giây.
+- Quy ước lọc duration cũ vẫn nằm trong `BaseDownloadService` để tái sử dụng khi cần, nhưng UI hiện không bật lựa chọn ngắn/dài cho nền tảng nào.
 
 ## Coding Rules
 

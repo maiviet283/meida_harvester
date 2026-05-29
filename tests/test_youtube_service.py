@@ -6,7 +6,7 @@ from unittest.mock import patch
 from yt_dlp import YoutubeDL
 
 from app.platforms.common import UserFacingDownloadError
-from app.platforms.youtube.service import YouTubeService
+from app.platforms.youtube.service import CONFIG, YouTubeService
 
 
 class YouTubeServiceTest(unittest.TestCase):
@@ -30,6 +30,22 @@ class YouTubeServiceTest(unittest.TestCase):
         self.assertNotIn("extractor_args", options)
         with YoutubeDL(options):
             pass
+
+    def test_page_download_has_no_short_long_filter(self) -> None:
+        service = YouTubeService()
+        progress = lambda *args: None
+
+        with patch.object(service, "download") as download:
+            service.download_page("https://www.youtube.com/@creator", "downloads", progress, page_filter="short")
+
+        download.assert_called_once_with(
+            "https://www.youtube.com/@creator",
+            "downloads",
+            progress,
+            single=False,
+            page_filter="all",
+        )
+        self.assertFalse(CONFIG.supports_page_filters)
 
     def test_normalizes_youtube_video_url_shapes(self) -> None:
         service = YouTubeService()

@@ -24,7 +24,14 @@ FACEBOOK_HEADERS = {
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/125.0.0.0 Safari/537.36"
     ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
     "Accept-Language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Cache-Control": "no-cache",
+    "Pragma": "no-cache",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Upgrade-Insecure-Requests": "1",
 }
 FACEBOOK_BROWSER_COOKIE_PATHS = (
     ("firefox", ("APPDATA", "Mozilla", "Firefox", "Profiles")),
@@ -37,7 +44,6 @@ CONFIG = PlatformConfig(
     key="facebook",
     example_video_url="https://www.facebook.com/watch/?v=123456789",
     example_page_url="https://www.facebook.com/example.page",
-    supports_page_filters=True,
     supports_manual_cookies=True,
 )
 
@@ -135,20 +141,20 @@ class FacebookService(BaseDownloadService):
         url: str,
         folder: str,
         progress: ProgressCallback,
-        page_filter: str = "short",
+        page_filter: str = "all",
     ) -> None:
         normalized = url.lower()
         if "/people/" in normalized:
             raise UserFacingDownloadError("facebook_people_page")
         if self.is_supported_video_url(url):
-            super().download_page(url, folder, progress, page_filter)
+            super().download_page(url, folder, progress, "all")
             return
 
         progress("reading", 18, None)
         urls = self.collect_page_video_urls(url, progress)
         if not urls:
             raise UserFacingDownloadError("facebook_page_no_videos")
-        self.download_urls(urls, folder, progress, single=False, page_filter=page_filter, emit_initial_progress=False)
+        self.download_urls(urls, folder, progress, single=False, page_filter="all", emit_initial_progress=False)
 
     def to_user_error(self, exc: DownloadError) -> UserFacingDownloadError:
         message = str(exc)

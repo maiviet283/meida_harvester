@@ -20,6 +20,9 @@ THEMES = {
         "primary_text": "#ffffff",
         "secondary": "#e7edf5",
         "secondary_hover": "#d7e0ec",
+        "cookie_help_bg": "#fff4cf",
+        "cookie_help_hover": "#ffe7a3",
+        "cookie_help_text": "#684a00",
         "tab_bg": "#dfe7f1",
         "tab_selected": "#ffffff",
         "input_bg": "#fbfdff",
@@ -51,6 +54,9 @@ THEMES = {
         "primary_text": "#ffffff",
         "secondary": "#243149",
         "secondary_hover": "#31415e",
+        "cookie_help_bg": "#3a2f14",
+        "cookie_help_hover": "#4d3d18",
+        "cookie_help_text": "#fde68a",
         "tab_bg": "#1c2638",
         "tab_selected": "#273652",
         "input_bg": "#101827",
@@ -246,6 +252,18 @@ def build_stylesheet(theme_name: str) -> str:
         QPushButton#secondaryButton:hover {{
             background: {theme["secondary_hover"]};
         }}
+        QPushButton#tabHelpButton {{
+            background: {theme["cookie_help_bg"]};
+            color: {theme["cookie_help_text"]};
+            border-radius: 18px;
+            padding: 12px 18px;
+            margin-bottom: 10px;
+            min-height: 18px;
+            font-weight: 650;
+        }}
+        QPushButton#tabHelpButton:hover {{
+            background: {theme["cookie_help_hover"]};
+        }}
         QPushButton#toolbarButton {{
             background: {theme["surface"]};
             color: {theme["text"]};
@@ -265,8 +283,10 @@ def build_stylesheet(theme_name: str) -> str:
         QMessageBox QPushButton {{
             background: {theme["secondary"]};
             color: {theme["text"]};
-            min-width: 88px;
-            min-height: 32px;
+            padding: 4px 14px;
+            min-width: 76px;
+            min-height: 24px;
+            max-height: 28px;
         }}
         QMessageBox QPushButton:hover {{
             background: {theme["secondary_hover"]};

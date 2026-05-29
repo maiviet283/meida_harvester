@@ -164,7 +164,9 @@ class MainWindow(QMainWindow):
         dialog.setText(self.t("dialog.exit_message"))
         dialog.setIcon(QMessageBox.Icon.Question)
         yes_btn = dialog.addButton(self.t("dialog.yes"), QMessageBox.ButtonRole.YesRole)
-        dialog.addButton(self.t("dialog.no"), QMessageBox.ButtonRole.NoRole)
+        no_btn = dialog.addButton(self.t("dialog.no"), QMessageBox.ButtonRole.NoRole)
+        yes_btn.setFixedSize(76, 28)
+        no_btn.setFixedSize(76, 28)
         dialog.setDefaultButton(dialog.buttons()[-1])
         dialog.exec()
         if dialog.clickedButton() == yes_btn:

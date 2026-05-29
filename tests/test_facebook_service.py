@@ -8,7 +8,7 @@ from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError
 
 from app.platforms.common import BaseDownloadService, UserFacingDownloadError
-from app.platforms.facebook.service import FacebookService
+from app.platforms.facebook.service import CONFIG, FacebookService
 
 
 class FacebookServiceTest(unittest.TestCase):
@@ -39,8 +39,9 @@ class FacebookServiceTest(unittest.TestCase):
 
         self.assertFalse(service.is_supported_video_url("https://www.facebook.com/HaiBuaNhan/"))
         self.assertFalse(service.is_supported_video_url("https://www.facebook.com/HaiBuaNhan/videos/"))
+        self.assertFalse(service.is_supported_video_url("https://www.facebook.com/FAPtivi/reels/"))
 
-    def test_full_page_download_collects_plain_profile_links_before_downloading(self) -> None:
+    def test_full_page_download_collects_plain_profile_links_without_duration_filter(self) -> None:
         service = FacebookService()
         progress = lambda *args: None
         urls = ["https://www.facebook.com/watch/?v=123456789"]
@@ -56,9 +57,10 @@ class FacebookServiceTest(unittest.TestCase):
             "downloads",
             progress,
             single=False,
-            page_filter="short",
+            page_filter="all",
             emit_initial_progress=False,
         )
+        self.assertFalse(CONFIG.supports_page_filters)
 
     def test_collects_facebook_video_urls_from_page_html(self) -> None:
         service = FacebookService()
@@ -88,6 +90,49 @@ class FacebookServiceTest(unittest.TestCase):
                 "https://www.facebook.com/watch/?v=555555555555555",
             ],
         )
+
+    def test_page_and_reels_links_scan_the_same_facebook_sections(self) -> None:
+        service = FacebookService()
+
+        self.assertEqual(
+            service.build_page_scan_urls("https://www.facebook.com/FAPtivi/"),
+            service.build_page_scan_urls("https://www.facebook.com/FAPtivi/reels/"),
+        )
+        self.assertIn(
+            "https://www.facebook.com/FAPtivi/reels",
+            service.build_page_scan_urls("https://www.facebook.com/FAPtivi/reels/"),
+        )
+
+    def test_page_fetch_uses_full_browser_document_headers(self) -> None:
+        service = FacebookService()
+        captured_requests = []
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def read(self) -> bytes:
+                return b"<html></html>"
+
+        def fake_urlopen(request, timeout):
+            captured_requests.append(request)
+            self.assertEqual(timeout, 25)
+            return FakeResponse()
+
+        with patch.object(service, "get_browser_cookie_header", return_value=None), patch(
+            "app.platforms.facebook.service.urlopen",
+            fake_urlopen,
+        ):
+            html = service.fetch_page_html("https://www.facebook.com/FAPtivi/reels/")
+
+        request = captured_requests[0]
+        self.assertEqual(html, "<html></html>")
+        self.assertIn("text/html", request.get_header("Accept"))
+        self.assertEqual(request.get_header("Sec-fetch-mode"), "navigate")
+        self.assertEqual(request.get_header("Upgrade-insecure-requests"), "1")
 
     def test_rejects_invalid_facebook_page_links(self) -> None:
         service = FacebookService()

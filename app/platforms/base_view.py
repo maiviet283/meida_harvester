@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
 
 from yt_dlp.utils import DownloadCancelled
 
+from app.cookie_store import get_cookie_store
 from app.locales import translate
 from app.platforms.common import BaseDownloadService, PlatformConfig, UserFacingDownloadError
 from app.update_ui import ensure_update_allowed
@@ -309,6 +310,9 @@ class PlatformPage(QWidget):
         self.service_cls = service_cls
         self.language_getter = language_getter
         self.theme_getter = theme_getter
+        self.cookie_store = get_cookie_store()
+        self.syncing_cookie = False
+        self.cookie_help_btn: QPushButton | None = None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(28, 20, 28, 28)
@@ -328,11 +332,18 @@ class PlatformPage(QWidget):
         layout.addLayout(title_block)
 
         self.tabs = QTabWidget()
+        if self.config.supports_manual_cookies:
+            self.cookie_help_btn = QPushButton()
+            self.cookie_help_btn.setObjectName("tabHelpButton")
+            self.cookie_help_btn.clicked.connect(self.show_cookie_help)
+            self.tabs.setCornerWidget(self.cookie_help_btn, Qt.Corner.TopRightCorner)
+
         self.single_panel = DownloadPanel(config, service_cls, "single", language_getter)
         self.page_panel = DownloadPanel(config, service_cls, "page", language_getter)
         self.tabs.addTab(self.single_panel, "")
         self.tabs.addTab(self.page_panel, "")
         layout.addWidget(self.tabs, 1)
+        self.setup_cookie_sync()
         self.retranslate()
         self.apply_theme()
 
@@ -344,8 +355,45 @@ class PlatformPage(QWidget):
         self.description.setText(self.t(f"platforms.{self.config.key}.description"))
         self.tabs.setTabText(0, self.t("tabs.single"))
         self.tabs.setTabText(1, self.t("tabs.page"))
+        if self.cookie_help_btn:
+            self.cookie_help_btn.setText(self.t("download.cookie_help_button"))
         self.single_panel.retranslate()
         self.page_panel.retranslate()
 
     def apply_theme(self) -> None:
         return
+
+    def show_cookie_help(self) -> None:
+        dialog = QMessageBox(self)
+        dialog.setWindowTitle(self.t("download.cookie_help_title"))
+        dialog.setText(self.t("download.cookie_help_message"))
+        dialog.setIcon(QMessageBox.Icon.Information)
+        dialog.addButton(self.t("dialog.ok"), QMessageBox.ButtonRole.AcceptRole)
+        dialog.exec()
+
+    def setup_cookie_sync(self) -> None:
+        if not self.config.supports_manual_cookies:
+            return
+
+        saved_cookie = self.cookie_store.get(self.config.key)
+        self.set_panel_cookie(self.single_panel, saved_cookie)
+        self.set_panel_cookie(self.page_panel, saved_cookie)
+        self.single_panel.cookie_input.textChanged.connect(self.sync_cookie_text)
+        self.page_panel.cookie_input.textChanged.connect(self.sync_cookie_text)
+
+    def sync_cookie_text(self, cookie_header: str) -> None:
+        if self.syncing_cookie:
+            return
+        self.syncing_cookie = True
+        try:
+            for panel in (self.single_panel, self.page_panel):
+                if panel.cookie_input.text() != cookie_header:
+                    self.set_panel_cookie(panel, cookie_header)
+            self.cookie_store.set(self.config.key, cookie_header)
+        finally:
+            self.syncing_cookie = False
+
+    def set_panel_cookie(self, panel: DownloadPanel, cookie_header: str) -> None:
+        was_blocked = panel.cookie_input.blockSignals(True)
+        panel.cookie_input.setText(cookie_header)
+        panel.cookie_input.blockSignals(was_blocked)

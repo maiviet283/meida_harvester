@@ -15,11 +15,19 @@ CONFIG = PlatformConfig(
     key="youtube",
     example_video_url="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
     example_page_url="https://www.youtube.com/@creator",
-    supports_page_filters=True,
 )
 
 
 class YouTubeService(BaseDownloadService):
+    def download_page(
+        self,
+        url: str,
+        folder: str,
+        progress: ProgressCallback,
+        page_filter: str = "all",
+    ) -> None:
+        self.download(url, folder, progress, single=False, page_filter="all")
+
     def build_yt_dlp_options(self, folder: str, hook: Callable[[dict], None], single: bool) -> dict:
         if not self.has_ffmpeg():
             raise UserFacingDownloadError("ffmpeg_missing")

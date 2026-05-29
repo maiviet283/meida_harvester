@@ -55,11 +55,7 @@ Download all available videos from:
 * Playlists
 * Creator pages
 
-Facebook, Instagram, and YouTube page downloads can filter:
-
-* Short videos only
-* Long videos only
-* Both short and long videos
+Facebook, Instagram, and YouTube page downloads now download every video the app can discover from the page without a short/long filter.
 
 Useful for:
 
@@ -83,6 +79,7 @@ Built as a native desktop-style application with:
 * Clean interface
 * Dark mode support
 * Vietnamese / English language toggle
+* Local saved cookies for Facebook and Instagram
 * Maximized startup window
 * Progress tracking
 * Thumbnail preview
