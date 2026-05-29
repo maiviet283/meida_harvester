@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QFont, QPainter, QPen, QPixmap
+from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import (
     QApplication,
     QFrame,
@@ -222,9 +223,20 @@ class MainWindow(QMainWindow):
         self.app_icon.setPixmap(pixmap)
 
 
+def _find_icon() -> Path | None:
+    if getattr(sys, "frozen", False):
+        candidate = Path(sys._MEIPASS) / "assets" / "icon.ico"  # type: ignore[attr-defined]
+    else:
+        candidate = Path(__file__).resolve().parents[1] / "assets" / "icon.ico"
+    return candidate if candidate.exists() else None
+
+
 def main() -> None:
     app = QApplication(sys.argv)
     app.setFont(QFont("Segoe UI", 10))
+    icon_path = _find_icon()
+    if icon_path:
+        app.setWindowIcon(QIcon(str(icon_path)))
 
     guard = SingleInstanceGuard()
     if not guard.is_primary:
