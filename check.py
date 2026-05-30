@@ -32,7 +32,10 @@ def main() -> int:
 
     python = VENV_PYTHON if VENV_PYTHON.exists() else Path(sys.executable)
 
-    run_step([str(python), "-m", "unittest", "discover", "-s", "tests"], "Run tests")
+    run_step([str(python), "-m", "unittest", "discover", "-s", "tests", "-v"], "Run tests")
+
+    if args.test_only:
+        return 0
 
     old_version_content = APP_VERSION_PATH.read_text(encoding="utf-8")
     old_update_content = UPDATE_JSON_PATH.read_text(encoding="utf-8")
@@ -89,6 +92,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run tests, force-bump version, build ClipFlow.exe, and create release/ClipFlow.zip."
     )
+    parser.add_argument("--test-only", action="store_true", help="Run tests only, skip version bump and build.")
     parser.add_argument("--no-bump", action="store_true", help="Do not increment APP_VERSION/update.json.")
     parser.add_argument("--no-build", action="store_true", help="Skip PyInstaller build and zip creation.")
     parser.add_argument(
