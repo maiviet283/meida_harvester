@@ -16,6 +16,8 @@ from app.platforms.tiktok.service import CONFIG as TIKTOK_CONFIG
 from app.platforms.tiktok.views import create_page as create_tiktok_page
 from app.platforms.youtube.service import CONFIG as YOUTUBE_CONFIG
 from app.platforms.youtube.views import create_page as create_youtube_page
+from app.platforms.telegram.service import CONFIG as TELEGRAM_CONFIG
+from app.platforms.telegram.views import create_page as create_telegram_page
 
 
 @dataclass(frozen=True)
@@ -30,4 +32,5 @@ PLATFORM_MODULES = [
     PlatformModule(FACEBOOK_CONFIG, create_facebook_page),
     PlatformModule(INSTAGRAM_CONFIG, create_instagram_page),
     PlatformModule(YOUTUBE_CONFIG, create_youtube_page),
+    PlatformModule(TELEGRAM_CONFIG, create_telegram_page),
 ]
