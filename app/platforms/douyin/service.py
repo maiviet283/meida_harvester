@@ -35,6 +35,7 @@ DOUYIN_FALLBACK_SPLIT_FORMATS = (
 )
 DOUYIN_POST_API_URL = "https://www.douyin.com/aweme/v1/web/aweme/post/"
 DOUYIN_SHARE_URL = "https://www.iesdouyin.com/share/video/{video_id}/"
+DOUYIN_SHARE_USER_URL = "https://www.iesdouyin.com/share/user/{sec_uid}"
 DOUYIN_MAX_PROFILE_PAGES = 80
 DOUYIN_PROFILE_PAGE_SIZE = 18
 DOUYIN_WEB_HEADERS = {
@@ -72,6 +73,7 @@ CONFIG = PlatformConfig(
     key="douyin",
     example_video_url="https://www.douyin.com/video/6961737553342991651",
     example_page_url="https://www.douyin.com/user/MS4wLjABAAAAEKnfa654JAJ_N5lgZDQluwsxmY0lhfmEYNQBBkwGG98",
+    supports_manual_cookies=True,
 )
 
 
@@ -322,11 +324,20 @@ class DouyinService(BaseDownloadService):
         seen_video_ids: set[str] = set()
         last_error: UserFacingDownloadError | None = None
 
+        # Primary: iesdouyin.com share user page (no cookies, same approach as single video)
         try:
-            self.collect_profile_api_video_urls(sec_uid, url, urls, seen_video_ids, progress)
+            self.collect_profile_share_video_urls(sec_uid, urls, seen_video_ids, progress)
         except UserFacingDownloadError as exc:
             last_error = exc
 
+        # Secondary: Douyin API (works with cookies, falls back to empty if none)
+        if not urls:
+            try:
+                self.collect_profile_api_video_urls(sec_uid, url, urls, seen_video_ids, progress)
+            except UserFacingDownloadError as exc:
+                last_error = exc
+
+        # Tertiary: desktop profile HTML scraping
         if not urls:
             try:
                 page_html = self.fetch_profile_html(url)
@@ -337,6 +348,43 @@ class DouyinService(BaseDownloadService):
         if not urls and last_error is not None:
             raise last_error
         return urls
+
+    def collect_profile_share_video_urls(
+        self,
+        sec_uid: str,
+        urls: list[str],
+        seen_video_ids: set[str],
+        progress: ProgressCallback | None = None,
+    ) -> None:
+        share_url = DOUYIN_SHARE_USER_URL.format(sec_uid=sec_uid)
+        request = Request(share_url, headers=DOUYIN_SHARE_HEADERS)
+        try:
+            with urlopen(request, timeout=25) as response:
+                page_html = response.read().decode("utf-8", errors="replace")
+        except (HTTPError, URLError, TimeoutError) as exc:
+            raise UserFacingDownloadError("douyin_profile_failed") from exc
+
+        try:
+            router_data = self.extract_router_data(page_html)
+            self._collect_aweme_ids_from_json(router_data, urls, seen_video_ids)
+        except Exception:
+            pass
+
+        self.add_video_urls_from_html(page_html, urls, seen_video_ids)
+
+    def _collect_aweme_ids_from_json(self, data: object, urls: list[str], seen_video_ids: set[str]) -> None:
+        if isinstance(data, dict):
+            for key in ("aweme_id", "awemeId", "group_id_str", "item_id", "itemId"):
+                value = data.get(key)
+                if isinstance(value, (str, int)):
+                    video_id = str(value)
+                    if video_id.isdigit() and len(video_id) >= 5:
+                        self.add_video_url(video_id, urls, seen_video_ids)
+            for child in data.values():
+                self._collect_aweme_ids_from_json(child, urls, seen_video_ids)
+        elif isinstance(data, list):
+            for item in data:
+                self._collect_aweme_ids_from_json(item, urls, seen_video_ids)
 
     def collect_profile_api_video_urls(
         self,
@@ -404,6 +452,9 @@ class DouyinService(BaseDownloadService):
     def build_headers(self, referer: str = "https://www.douyin.com/") -> dict[str, str]:
         headers = dict(DOUYIN_WEB_HEADERS)
         headers["Referer"] = referer
+        manual_cookie = self.get_manual_cookie_header()
+        if manual_cookie:
+            headers["Cookie"] = manual_cookie
         return headers
 
     def extract_douyin_url(self, text: str) -> str:
