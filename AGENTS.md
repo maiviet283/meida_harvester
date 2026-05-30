@@ -147,7 +147,7 @@ app/
   - TikTok: tải toàn profile; bỏ qua slideshow không có video track.
   - Douyin: tải 1 video bằng trang share mobile công khai của Douyin (`www.iesdouyin.com/share/video/<id>/`), parse `window._ROUTER_DATA` để lấy URL video trực tiếp rồi đưa cho `yt-dlp`; nhận link video trực tiếp, profile URL kèm `modal_id`, short link `v.douyin.com`, hoặc cả đoạn text share có chứa link; tab tải toàn trang tự canonical hóa profile về `https://www.douyin.com/user/<SEC_UID>` rồi gom URL video từ API/web HTML Douyin và tải từng video; nếu Douyin trả captcha/body rỗng cho profile thì báo lỗi thân thiện `douyin_profile_failed`; ưu tiên H.264+AAC giống TikTok; không hiển thị ô cookie và không tự đọc cookie browser.
   - Instagram: dùng API profile + clips + feed riêng; dùng Clips API (`/api/v1/clips/user/`) làm nguồn chính cho Reels; bỏ qua carousel/ảnh/post giới hạn audience; ưu tiên Full HD ≤ 1920px, H.264+AAC/M4A; ưu tiên cookie UI → browser (Firefox/Edge/Chrome); retry không cookie nếu DPAPI lỗi.
-  - Facebook: quét HTML trang/videos/reels để gom link trước khi gọi `yt-dlp`; tự đọc cookie browser; ưu tiên cookie UI; retry không cookie nếu DPAPI lỗi; chặn link `/people/...`.
+  - Facebook: quét HTML trang/videos/reels và gọi thêm GraphQL cursor của Reels (`ProfileCometAppCollectionReelsRendererPaginationQuery`) để gom sâu hơn batch đầu trước khi gọi `yt-dlp`; profile numeric dùng `profile.php?id=<ID>&sk=reels_tab` cho tab Reels; tự đọc cookie browser; ưu tiên cookie UI; retry không cookie nếu DPAPI lỗi; chặn link `/people/...`.
   - YouTube: tải toàn kênh/playlist.
 - Lọc duration: ngắn `≤ 180s`, dài `≥ 181s`. Logic nằm trong `BaseDownloadService` nhưng UI hiện không bật lựa chọn ngắn/dài.
 

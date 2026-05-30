@@ -73,7 +73,6 @@ CONFIG = PlatformConfig(
     key="douyin",
     example_video_url="https://www.douyin.com/video/6961737553342991651",
     example_page_url="https://www.douyin.com/user/MS4wLjABAAAAEKnfa654JAJ_N5lgZDQluwsxmY0lhfmEYNQBBkwGG98",
-    supports_manual_cookies=True,
 )
 
 

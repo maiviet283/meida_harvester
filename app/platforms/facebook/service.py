@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import html as html_lib
+import json
 import os
 from pathlib import Path
 import re
 from typing import Callable
 from urllib.error import HTTPError, URLError
-from urllib.parse import parse_qs, urljoin, urlparse
+from urllib.parse import parse_qs, urlencode, urljoin, urlparse
 from urllib.request import Request, urlopen
 
 from yt_dlp.cookies import extract_cookies_from_browser
@@ -18,6 +19,10 @@ from app.platforms.common import BaseDownloadService, PlatformConfig, ProgressCa
 FACEBOOK_COMBINED_FORMAT = "b[ext=mp4]/b"
 FACEBOOK_SPLIT_FORMAT = "bv*[ext=mp4]+ba[ext=m4a]/bv*+ba/b[ext=mp4]/b"
 FACEBOOK_MAX_SCAN_PAGES = 40
+FACEBOOK_MAX_REELS_GRAPHQL_PAGES = 40
+FACEBOOK_GRAPHQL_URL = "https://www.facebook.com/api/graphql/"
+FACEBOOK_REELS_PAGINATION_FRIENDLY_NAME = "ProfileCometAppCollectionReelsRendererPaginationQuery"
+FACEBOOK_REELS_PAGINATION_DOC_ID = "26962700580026484"
 FACEBOOK_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -37,6 +42,13 @@ FACEBOOK_BROWSER_COOKIE_PATHS = (
     ("firefox", ("APPDATA", "Mozilla", "Firefox", "Profiles")),
     ("edge", ("LOCALAPPDATA", "Microsoft", "Edge", "User Data")),
     ("chrome", ("LOCALAPPDATA", "Google", "Chrome", "User Data")),
+)
+FACEBOOK_REELS_PAGE_INFO_RE = re.compile(
+    r'"aggregated_fb_shorts"\s*:\s*\{.*?"page_info"\s*:\s*\{\s*'
+    r'"end_cursor"\s*:\s*"(?P<cursor>[^"]+)"\s*,\s*'
+    r'"has_next_page"\s*:\s*(?P<has_next>true|false)\s*\}\s*\}\s*,\s*'
+    r'"id"\s*:\s*"(?P<collection_id>[^"]+)"',
+    re.DOTALL,
 )
 
 
@@ -224,6 +236,7 @@ class FacebookService(BaseDownloadService):
         urls: list[str] = []
         seen_video_keys: set[str] = set()
         seen_scan_urls: set[str] = set()
+        seen_reels_page_states: set[tuple[str, str]] = set()
         queue = list(scan_urls)
         scan_count = 0
         had_readable_page = False
@@ -246,6 +259,14 @@ class FacebookService(BaseDownloadService):
             had_readable_page = True
             decoded_html = self.decode_facebook_html(page_html)
             self.add_video_urls_from_html(decoded_html, scan_url, urls, seen_video_keys)
+            self.collect_reels_graphql_video_urls(
+                decoded_html,
+                scan_url,
+                urls,
+                seen_video_keys,
+                seen_reels_page_states,
+                progress,
+            )
 
             for next_url in self.extract_next_scan_urls(decoded_html, scan_url):
                 if next_url not in seen_scan_urls and next_url not in queue:
@@ -253,7 +274,6 @@ class FacebookService(BaseDownloadService):
 
         if not urls and not had_readable_page:
             raise UserFacingDownloadError("facebook_page_failed")
-        print(f"[Facebook] collect_page_video_urls → {len(urls)} URLs: {urls[:5]}")
         return urls
 
     def build_page_scan_urls(self, url: str) -> list[str]:
@@ -270,11 +290,11 @@ class FacebookService(BaseDownloadService):
             if not profile_id.isdigit():
                 return []
             return [
-                f"https://mbasic.facebook.com/profile.php?id={profile_id}&sk=reels",
+                f"https://www.facebook.com/profile.php?id={profile_id}&sk=reels_tab",
+                f"https://m.facebook.com/profile.php?id={profile_id}&sk=reels_tab",
+                f"https://mbasic.facebook.com/profile.php?id={profile_id}&sk=reels_tab",
                 f"https://mbasic.facebook.com/profile.php?id={profile_id}&sk=videos",
-                f"https://www.facebook.com/profile.php?id={profile_id}&sk=reels",
                 f"https://www.facebook.com/profile.php?id={profile_id}&sk=videos",
-                f"https://m.facebook.com/profile.php?id={profile_id}&sk=reels",
                 f"https://m.facebook.com/profile.php?id={profile_id}&sk=videos",
             ]
 
@@ -311,6 +331,190 @@ class FacebookService(BaseDownloadService):
         request = Request(url, headers=headers)
         try:
             with urlopen(request, timeout=25) as response:
+                return response.read().decode("utf-8", errors="replace")
+        except (HTTPError, URLError, TimeoutError) as exc:
+            raise UserFacingDownloadError("facebook_page_failed") from exc
+
+    def collect_reels_graphql_video_urls(
+        self,
+        page_html: str,
+        referer: str,
+        urls: list[str],
+        seen_video_keys: set[str],
+        seen_page_states: set[tuple[str, str]],
+        progress: ProgressCallback | None = None,
+    ) -> None:
+        page_states = self.extract_reels_pagination_states(page_html)
+        if not page_states:
+            return
+
+        metadata = self.extract_graphql_metadata(page_html)
+        doc_id = self.get_reels_pagination_doc_id(page_html, referer)
+        pages_read = 0
+        queue = list(page_states)
+
+        while queue and pages_read < FACEBOOK_MAX_REELS_GRAPHQL_PAGES:
+            self.raise_if_cancelled()
+            cursor, collection_id = queue.pop(0)
+            state_key = (collection_id, cursor)
+            if state_key in seen_page_states:
+                continue
+            seen_page_states.add(state_key)
+
+            if progress:
+                progress("reading", min(85, 45 + pages_read), None)
+
+            try:
+                response_html = self.fetch_reels_graphql_page(collection_id, cursor, metadata, doc_id, referer)
+            except UserFacingDownloadError:
+                return
+
+            decoded_response = self.decode_facebook_html(response_html)
+            self.add_video_urls_from_html(decoded_response, referer, urls, seen_video_keys)
+            pages_read += 1
+
+            for next_cursor, next_collection_id in self.extract_reels_pagination_states(decoded_response):
+                next_state = (next_cursor, next_collection_id)
+                if (next_collection_id, next_cursor) not in seen_page_states and next_state not in queue:
+                    queue.append(next_state)
+
+    def extract_reels_pagination_states(self, page_html: str) -> list[tuple[str, str]]:
+        states: list[tuple[str, str]] = []
+        seen: set[tuple[str, str]] = set()
+        for match in FACEBOOK_REELS_PAGE_INFO_RE.finditer(page_html):
+            if match.group("has_next") != "true":
+                continue
+            state = (match.group("cursor"), match.group("collection_id"))
+            if state in seen:
+                continue
+            seen.add(state)
+            states.append(state)
+        return states
+
+    def extract_graphql_metadata(self, page_html: str) -> dict[str, str]:
+        patterns = {
+            "lsd": r'"LSD",\[\],\{"token":"([^"]*)"',
+            "fb_dtsg": r'"DTSGInitialData",\[\],\{"token":"([^"]*)"',
+            "__spin_r": r'"__spin_r":(\d+)',
+            "__spin_t": r'"__spin_t":(\d+)',
+            "__hsi": r'"hsi":"([^"]+)"',
+        }
+        metadata: dict[str, str] = {}
+        for key, pattern in patterns.items():
+            match = re.search(pattern, page_html)
+            if match and match.group(1):
+                metadata[key] = match.group(1)
+        return metadata
+
+    def get_reels_pagination_doc_id(self, page_html: str, base_url: str) -> str:
+        cached_doc_id = getattr(self, "_reels_pagination_doc_id", "")
+        if cached_doc_id:
+            return cached_doc_id
+
+        doc_id = self.extract_reels_pagination_doc_id(page_html)
+        if not doc_id:
+            for script_url in self.extract_script_urls(page_html, base_url):
+                try:
+                    script = self.fetch_static_resource(script_url)
+                except UserFacingDownloadError:
+                    continue
+                doc_id = self.extract_reels_pagination_doc_id(script)
+                if doc_id:
+                    break
+
+        self._reels_pagination_doc_id = doc_id or FACEBOOK_REELS_PAGINATION_DOC_ID
+        return self._reels_pagination_doc_id
+
+    def extract_reels_pagination_doc_id(self, text: str) -> str | None:
+        pattern = (
+            rf'{FACEBOOK_REELS_PAGINATION_FRIENDLY_NAME}_facebookRelayOperation"'
+            r',\[\],\(function\([^)]*\)\{[^}]*exports="(\d+)"'
+        )
+        match = re.search(pattern, text)
+        if match:
+            return match.group(1)
+        return None
+
+    def extract_script_urls(self, page_html: str, base_url: str) -> list[str]:
+        urls: list[str] = []
+        for src in re.findall(r'''(?i)<script[^>]+\bsrc=["']([^"']+)["']''', page_html):
+            script_url = urljoin(base_url, src)
+            if not script_url.startswith("http") or script_url in urls:
+                continue
+            urls.append(script_url)
+        return urls
+
+    def fetch_static_resource(self, url: str) -> str:
+        headers = {
+            "User-Agent": FACEBOOK_HEADERS["User-Agent"],
+            "Accept": "*/*",
+            "Accept-Language": FACEBOOK_HEADERS["Accept-Language"],
+        }
+        try:
+            with urlopen(Request(url, headers=headers), timeout=25) as response:
+                return response.read().decode("utf-8", errors="replace")
+        except (HTTPError, URLError, TimeoutError) as exc:
+            raise UserFacingDownloadError("facebook_page_failed") from exc
+
+    def fetch_reels_graphql_page(
+        self,
+        collection_id: str,
+        cursor: str,
+        metadata: dict[str, str],
+        doc_id: str,
+        referer: str,
+    ) -> str:
+        variables = {
+            "count": 10,
+            "cursor": cursor,
+            "id": collection_id,
+            "renderLocation": "timeline",
+            "scale": 1,
+            "useDefaultActor": True,
+        }
+        payload = {
+            "__a": "1",
+            "__comet_req": "15",
+            "fb_api_caller_class": "RelayModern",
+            "fb_api_req_friendly_name": FACEBOOK_REELS_PAGINATION_FRIENDLY_NAME,
+            "variables": json.dumps(variables, separators=(",", ":")),
+            "server_timestamps": "true",
+            "doc_id": doc_id,
+        }
+        if metadata.get("lsd"):
+            lsd = metadata["lsd"]
+            payload["lsd"] = lsd
+            payload["jazoest"] = f"2{sum(ord(char) for char in lsd)}"
+        if metadata.get("fb_dtsg"):
+            payload["fb_dtsg"] = metadata["fb_dtsg"]
+        for key in ("__spin_r", "__spin_t", "__hsi"):
+            if metadata.get(key):
+                payload[key] = metadata[key]
+
+        headers = dict(FACEBOOK_HEADERS)
+        headers.update(
+            {
+                "Accept": "*/*",
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Origin": "https://www.facebook.com",
+                "Referer": referer,
+                "X-FB-Friendly-Name": FACEBOOK_REELS_PAGINATION_FRIENDLY_NAME,
+            }
+        )
+        if metadata.get("lsd"):
+            headers["X-FB-LSD"] = metadata["lsd"]
+        cookie_header = self.get_manual_cookie_header() or self.get_browser_cookie_header(referer)
+        if cookie_header:
+            headers["Cookie"] = cookie_header
+
+        try:
+            request = Request(
+                FACEBOOK_GRAPHQL_URL,
+                data=urlencode(payload).encode("utf-8"),
+                headers=headers,
+                method="POST",
+            )
+            with urlopen(request, timeout=60) as response:
                 return response.read().decode("utf-8", errors="replace")
         except (HTTPError, URLError, TimeoutError) as exc:
             raise UserFacingDownloadError("facebook_page_failed") from exc

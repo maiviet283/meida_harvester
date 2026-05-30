@@ -102,6 +102,56 @@ class FacebookServiceTest(unittest.TestCase):
             "https://www.facebook.com/FAPtivi/reels",
             service.build_page_scan_urls("https://www.facebook.com/FAPtivi/reels/"),
         )
+        self.assertIn(
+            "https://www.facebook.com/profile.php?id=61563696585380&sk=reels_tab",
+            service.build_page_scan_urls("https://www.facebook.com/profile.php?id=61563696585380&sk=reels_tab"),
+        )
+
+    def test_collects_facebook_reels_with_graphql_pagination(self) -> None:
+        service = FacebookService()
+        initial_html = """
+            ["LSD",[],{"token":"test-lsd"}]
+            {"__spin_r":123,"__spin_t":456,"hsi":"789"}
+            <a href="/reel/111111111111111/">initial</a>
+            "aggregated_fb_shorts":{"edges":[],"page_info":{"end_cursor":"cursor-1","has_next_page":true}},"id":"collection-1"
+        """
+        first_graphql_page = """
+            <a href="/reel/222222222222222/">second</a>
+            "aggregated_fb_shorts":{"edges":[],"page_info":{"end_cursor":"cursor-2","has_next_page":true}},"id":"collection-1"
+        """
+        second_graphql_page = """
+            <a href="/reel/333333333333333/">third</a>
+            "aggregated_fb_shorts":{"edges":[],"page_info":{"end_cursor":"cursor-3","has_next_page":false}},"id":"collection-1"
+        """
+
+        with patch.object(
+            service,
+            "build_page_scan_urls",
+            return_value=["https://www.facebook.com/FAPtivi/reels"],
+        ), patch.object(service, "fetch_page_html", return_value=initial_html), patch.object(
+            service, "get_reels_pagination_doc_id", return_value="doc-id"
+        ), patch.object(
+            service,
+            "fetch_reels_graphql_page",
+            side_effect=[first_graphql_page, second_graphql_page],
+        ) as fetch_graphql:
+            urls = service.collect_page_video_urls("https://www.facebook.com/FAPtivi/reels/")
+
+        self.assertEqual(
+            urls,
+            [
+                "https://www.facebook.com/reel/111111111111111/",
+                "https://www.facebook.com/reel/222222222222222/",
+                "https://www.facebook.com/reel/333333333333333/",
+            ],
+        )
+        self.assertEqual(fetch_graphql.call_args_list[0].args[:3], ("collection-1", "cursor-1", {
+            "lsd": "test-lsd",
+            "__spin_r": "123",
+            "__spin_t": "456",
+            "__hsi": "789",
+        }))
+        self.assertEqual(fetch_graphql.call_args_list[1].args[:2], ("collection-1", "cursor-2"))
 
     def test_page_fetch_uses_full_browser_document_headers(self) -> None:
         service = FacebookService()
