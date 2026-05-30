@@ -64,7 +64,7 @@ class BaseDownloadService:
         if self.is_cancel_requested():
             raise DownloadCancelled()
 
-    def clean_input_url(self, url: str) -> str:
+    def clean_input_url(self, url: str, mode: str = "") -> str:
         return url.strip()
 
     def set_manual_cookie_header(self, cookie_header: str) -> None:

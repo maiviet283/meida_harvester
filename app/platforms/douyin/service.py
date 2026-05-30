@@ -76,8 +76,13 @@ CONFIG = PlatformConfig(
 
 
 class DouyinService(BaseDownloadService):
-    def clean_input_url(self, url: str) -> str:
-        return self.extract_douyin_url(url)
+    def clean_input_url(self, url: str, mode: str = "") -> str:
+        url = self.extract_douyin_url(url)
+        if mode == "page":
+            sec_uid = self.extract_profile_sec_uid(url)
+            if sec_uid:
+                return self.canonical_profile_url(sec_uid)
+        return url
 
     def download_urls(
         self,
@@ -491,11 +496,19 @@ class DouyinService(BaseDownloadService):
 
     def normalize_profile_url(self, url: str) -> str:
         url = self.extract_douyin_url(url)
-        if self.extract_profile_sec_uid(url):
-            return url
+        sec_uid = self.extract_profile_sec_uid(url)
+        if sec_uid:
+            return self.canonical_profile_url(sec_uid)
         if self.is_short_douyin_url(url):
-            return self.resolve_douyin_redirect(url)
+            resolved_url = self.resolve_douyin_redirect(url)
+            sec_uid = self.extract_profile_sec_uid(resolved_url)
+            if sec_uid:
+                return self.canonical_profile_url(sec_uid)
+            return resolved_url
         return url
+
+    def canonical_profile_url(self, sec_uid: str) -> str:
+        return f"https://www.douyin.com/user/{sec_uid}"
 
     def extract_profile_sec_uid(self, url: str) -> str | None:
         url = self.extract_douyin_url(url)

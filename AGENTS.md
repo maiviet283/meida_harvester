@@ -73,7 +73,7 @@ python check.py --no-bump --no-build  → chỉ test nhanh
 - Registry: `app/platforms/registry.py`.
 - Shared config/service types: `app/platforms/common.py`.
   - `PlatformConfig.supports_manual_cookies=True` cho nền tảng cần ô cookie trong UI.
-  - `BaseDownloadService.clean_input_url()` là hook dọn input trước khi tải; mặc định chỉ `strip()`, nền tảng có share text như Douyin có thể override để tách URL thật.
+  - `BaseDownloadService.clean_input_url(url, mode="")` là hook dọn input trước khi tải; mặc định chỉ `strip()`, nền tảng có share text như Douyin có thể override để tách URL thật hoặc canonical hóa URL theo tab.
 - Shared platform page/download UI: `app/platforms/base_view.py`.
   - `start_download()` kiểm tra **license** rồi **version** trước khi bắt đầu tải.
 - Mỗi nền tảng: `app/platforms/<platform>/service.py` + `app/platforms/<platform>/views.py`.
@@ -145,7 +145,7 @@ app/
 - `Tải video`: 1 link, 1 video, không phân biệt ngắn/dài.
 - `Tải cả trang`:
   - TikTok: tải toàn profile; bỏ qua slideshow không có video track.
-  - Douyin: tải 1 video bằng trang share mobile công khai của Douyin (`www.iesdouyin.com/share/video/<id>/`), parse `window._ROUTER_DATA` để lấy URL video trực tiếp rồi đưa cho `yt-dlp`; nhận link video trực tiếp, profile URL kèm `modal_id`, short link `v.douyin.com`, hoặc cả đoạn text share có chứa link; tải toàn profile bằng cách gom URL video từ API/web HTML Douyin rồi tải từng video; ưu tiên H.264+AAC giống TikTok; không hiển thị ô cookie và không tự đọc cookie browser.
+  - Douyin: tải 1 video bằng trang share mobile công khai của Douyin (`www.iesdouyin.com/share/video/<id>/`), parse `window._ROUTER_DATA` để lấy URL video trực tiếp rồi đưa cho `yt-dlp`; nhận link video trực tiếp, profile URL kèm `modal_id`, short link `v.douyin.com`, hoặc cả đoạn text share có chứa link; tab tải toàn trang tự canonical hóa profile về `https://www.douyin.com/user/<SEC_UID>` rồi gom URL video từ API/web HTML Douyin và tải từng video; nếu Douyin trả captcha/body rỗng cho profile thì báo lỗi thân thiện `douyin_profile_failed`; ưu tiên H.264+AAC giống TikTok; không hiển thị ô cookie và không tự đọc cookie browser.
   - Instagram: dùng API profile + clips + feed riêng; dùng Clips API (`/api/v1/clips/user/`) làm nguồn chính cho Reels; bỏ qua carousel/ảnh/post giới hạn audience; ưu tiên Full HD ≤ 1920px, H.264+AAC/M4A; ưu tiên cookie UI → browser (Firefox/Edge/Chrome); retry không cookie nếu DPAPI lỗi.
   - Facebook: quét HTML trang/videos/reels để gom link trước khi gọi `yt-dlp`; tự đọc cookie browser; ưu tiên cookie UI; retry không cookie nếu DPAPI lỗi; chặn link `/people/...`.
   - YouTube: tải toàn kênh/playlist.

@@ -125,7 +125,7 @@ TEXT = {
         "login_required": "This content requires login or is not public. The app currently downloads public links only.",
         "douyin_single_link": "This is not a direct Douyin video link. Use a link like https://www.douyin.com/video/123456789.",
         "douyin_page_link": "This is not a Douyin profile link. Use a link like https://www.douyin.com/user/SEC_UID.",
-        "douyin_profile_failed": "Douyin did not return profile data for this link. Try another public profile link or try again later.",
+        "douyin_profile_failed": "Douyin did not return a public video list for this profile. Try again later or use single video/share links.",
         "douyin_page_no_videos": "No public videos were found on this Douyin profile.",
         "douyin_resolve_failed": "Could not open this shortened Douyin link. Paste the full link or try again later.",
         "douyin_extract_failed": "Douyin did not return public video data for this link. Try another public link or try again later.",

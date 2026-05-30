@@ -199,7 +199,7 @@ class DownloadPanel(QFrame):
     def clean_url_input(self, text: str) -> None:
         if self.cleaning_url_input:
             return
-        cleaned_url = self.service_cls().clean_input_url(text)
+        cleaned_url = self.service_cls().clean_input_url(text, self.mode)
         if cleaned_url == text:
             return
         self.cleaning_url_input = True
@@ -261,7 +261,7 @@ class DownloadPanel(QFrame):
             self.show_warning(self.t("download.missing_url_title"), self.t("download.missing_url_message"))
             return
         service = self.service_cls()
-        cleaned_url = service.clean_input_url(url)
+        cleaned_url = service.clean_input_url(url, self.mode)
         if cleaned_url != url:
             url = cleaned_url
             self.url_input.setText(url)

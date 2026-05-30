@@ -100,6 +100,18 @@ class DouyinServiceTest(unittest.TestCase):
         self.assertFalse(CONFIG.supports_analysis)
         self.assertFalse(CONFIG.supports_manual_cookies)
 
+    def test_page_input_cleans_douyin_profile_urls_to_canonical_page(self) -> None:
+        service = DouyinService()
+        profile_url = "https://www.douyin.com/user/MS4wLjABAAAAXWJUqCwwiS4HNsaugvaE0EuG9WcdFUXJdH1pPDWGfs4"
+        profile_url_with_video_query = f"{profile_url}?from_tab_name=main&vid=7626606075693986661"
+        profile_url_with_modal_query = f"{profile_url}?modal_id=7626606075693986661&showTab=post"
+
+        self.assertEqual(service.clean_input_url(profile_url, "page"), profile_url)
+        self.assertEqual(service.clean_input_url(profile_url_with_video_query, "page"), profile_url)
+        self.assertEqual(service.clean_input_url(profile_url_with_modal_query, "page"), profile_url)
+        self.assertEqual(service.normalize_profile_url(profile_url_with_video_query), profile_url)
+        self.assertEqual(service.clean_input_url(profile_url_with_modal_query, "single"), profile_url_with_modal_query)
+
     def test_collects_profile_video_urls_with_api_pagination(self) -> None:
         service = DouyinService()
         profile_text = (

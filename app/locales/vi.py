@@ -125,7 +125,7 @@ TEXT = {
         "login_required": "Nội dung này cần đăng nhập hoặc không công khai. Hiện app chỉ tải được link công khai.",
         "douyin_single_link": "Link này không phải link video Douyin trực tiếp. Hãy dùng link dạng https://www.douyin.com/video/123456789.",
         "douyin_page_link": "Link này không phải link hồ sơ Douyin. Hãy dùng link dạng https://www.douyin.com/user/SEC_UID.",
-        "douyin_profile_failed": "Douyin không trả dữ liệu hồ sơ cho link này. Hãy thử link hồ sơ công khai khác hoặc thử lại sau.",
+        "douyin_profile_failed": "Douyin không trả danh sách video công khai cho hồ sơ này. Hãy thử lại sau hoặc dùng từng link video/share.",
         "douyin_page_no_videos": "Không tìm thấy video công khai nào trên hồ sơ Douyin này.",
         "douyin_resolve_failed": "Không mở được link rút gọn Douyin này. Hãy thử dán link đầy đủ hoặc thử lại sau.",
         "douyin_extract_failed": "Douyin không trả dữ liệu video công khai cho link này. Hãy thử link công khai khác hoặc thử lại sau.",
