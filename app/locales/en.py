@@ -14,6 +14,10 @@ TEXT = {
             "name": "TikTok",
             "description": "Download short videos, reels, and scan every video from a TikTok profile.",
         },
+        "douyin": {
+            "name": "Douyin",
+            "description": "Download Douyin China videos and collect every public video from a Douyin profile.",
+        },
         "facebook": {
             "name": "Facebook",
             "description": "Download Facebook videos, Reels, and scan videos from a page or profile.",
@@ -119,6 +123,12 @@ TEXT = {
         "ffmpeg_missing": "FFmpeg is required to merge video/audio files for this link. Add FFmpeg to the ffmpeg folder or PATH, then download again.",
         "extractor_changed": "Facebook changed its page structure, so yt-dlp cannot read this link. Try another video/reel link or update yt-dlp later.",
         "login_required": "This content requires login or is not public. The app currently downloads public links only.",
+        "douyin_single_link": "This is not a direct Douyin video link. Use a link like https://www.douyin.com/video/123456789.",
+        "douyin_page_link": "This is not a Douyin profile link. Use a link like https://www.douyin.com/user/SEC_UID.",
+        "douyin_profile_failed": "Douyin did not return profile data for this link. Try another public profile link or try again later.",
+        "douyin_page_no_videos": "No public videos were found on this Douyin profile.",
+        "douyin_resolve_failed": "Could not open this shortened Douyin link. Paste the full link or try again later.",
+        "douyin_extract_failed": "Douyin did not return public video data for this link. Try another public link or try again later.",
         "facebook_single_link": "This is not a direct Facebook video link. Use a watch, videos, reel, or fb.watch link.",
         "facebook_people_page": "Facebook /people/... profiles are not reliable for full-page downloads through yt-dlp. Use a single video/reel link or a public page video tab.",
         "facebook_parse_failed": "Facebook did not return video data for this link. Sign in to Facebook in Edge/Chrome/Firefox on this computer, use a public video/reel link, then try again.",

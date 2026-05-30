@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from http.cookies import CookieError, SimpleCookie
 from pathlib import Path
 import shutil
+import sys
 import tempfile
 from typing import Callable
 
@@ -32,16 +33,24 @@ class UserFacingDownloadError(Exception):
 
 
 class YtDlpLogger:
+    def _print(self, message: str) -> None:
+        try:
+            print(message)
+        except UnicodeEncodeError:
+            encoding = sys.stdout.encoding or "utf-8"
+            safe_message = message.encode(encoding, errors="replace").decode(encoding, errors="replace")
+            print(safe_message)
+
     def debug(self, message: str) -> None:
         if message.startswith("[debug]"):
             return
-        print(f"[yt-dlp] {message}")
+        self._print(f"[yt-dlp] {message}")
 
     def warning(self, message: str) -> None:
-        print(f"[yt-dlp] WARNING: {message}")
+        self._print(f"[yt-dlp] WARNING: {message}")
 
     def error(self, message: str) -> None:
-        print(f"[yt-dlp] ERROR: {message}")
+        self._print(f"[yt-dlp] ERROR: {message}")
 
 
 class BaseDownloadService:
@@ -54,6 +63,9 @@ class BaseDownloadService:
     def raise_if_cancelled(self) -> None:
         if self.is_cancel_requested():
             raise DownloadCancelled()
+
+    def clean_input_url(self, url: str) -> str:
+        return url.strip()
 
     def set_manual_cookie_header(self, cookie_header: str) -> None:
         self.manual_cookie_header = self.normalize_cookie_header(cookie_header)

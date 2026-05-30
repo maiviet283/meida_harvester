@@ -101,6 +101,7 @@ class DownloadPanel(QFrame):
         self.save_path = ""
         self.thread: QThread | None = None
         self.worker: DownloadWorker | None = None
+        self.cleaning_url_input = False
         self.setObjectName("downloadPanel")
 
         layout = QVBoxLayout(self)
@@ -119,6 +120,7 @@ class DownloadPanel(QFrame):
         self.url_input = QLineEdit()
         self.url_input.setClearButtonEnabled(True)
         self.url_input.setMinimumHeight(42)
+        self.url_input.textChanged.connect(self.clean_url_input)
         layout.addWidget(self.url_input)
 
         self.cookie_hint = QLabel()
@@ -194,6 +196,18 @@ class DownloadPanel(QFrame):
         layout.addStretch(1)
         self.retranslate()
 
+    def clean_url_input(self, text: str) -> None:
+        if self.cleaning_url_input:
+            return
+        cleaned_url = self.service_cls().clean_input_url(text)
+        if cleaned_url == text:
+            return
+        self.cleaning_url_input = True
+        try:
+            self.url_input.setText(cleaned_url)
+        finally:
+            self.cleaning_url_input = False
+
     def t(self, key: str, **kwargs: str) -> str:
         return translate(self.language_getter(), key, **kwargs)
 
@@ -246,6 +260,11 @@ class DownloadPanel(QFrame):
         if not url:
             self.show_warning(self.t("download.missing_url_title"), self.t("download.missing_url_message"))
             return
+        service = self.service_cls()
+        cleaned_url = service.clean_input_url(url)
+        if cleaned_url != url:
+            url = cleaned_url
+            self.url_input.setText(url)
         if not self.save_path:
             self.choose_folder()
             if not self.save_path:
@@ -267,7 +286,7 @@ class DownloadPanel(QFrame):
         page_filter = self.page_filter_box.currentData() if self.page_filter_box.isVisible() else "all"
         cookie_header = self.cookie_input.text().strip() if self.cookie_input.isVisible() else ""
         self.worker = DownloadWorker(
-            self.service_cls(),
+            service,
             self.mode,
             url,
             self.save_path,
@@ -1172,7 +1191,9 @@ class PlatformPage(QWidget):
     def show_cookie_help(self) -> None:
         dialog = QMessageBox(self)
         dialog.setWindowTitle(self.t("download.cookie_help_title"))
-        dialog.setText(self.t("download.cookie_help_message"))
+        platform_key = f"download.cookie_help_message_{self.config.key}"
+        msg = self.t(platform_key)
+        dialog.setText(msg if msg != platform_key else self.t("download.cookie_help_message"))
         dialog.setIcon(QMessageBox.Icon.Information)
         dialog.addButton(self.t("dialog.ok"), QMessageBox.ButtonRole.AcceptRole)
         dialog.exec()

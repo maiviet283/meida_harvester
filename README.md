@@ -13,6 +13,7 @@ The project is designed as a personal productivity tool focused on fast media co
 ### Supported Platforms
 
 * TikTok
+* Douyin
 * YouTube
 * YouTube Shorts
 * Facebook Videos
@@ -40,6 +41,7 @@ Supported formats:
 ClipFlow supports downloading short-form content such as:
 
 * TikTok videos
+* Douyin videos
 * YouTube Shorts
 * Instagram Reels
 * Facebook Reels
@@ -51,11 +53,12 @@ ClipFlow supports downloading short-form content such as:
 Download all available videos from:
 
 * TikTok profiles
+* Douyin profiles
 * YouTube channels
 * Playlists
 * Creator pages
 
-Facebook, Instagram, and YouTube page downloads now download every video the app can discover from the page without a short/long filter.
+Douyin, Facebook, Instagram, and YouTube page downloads now download every video the app can discover from the page without a short/long filter. Douyin accepts direct video links, profile links with `modal_id`, `v.douyin.com` short links, and copied share text that contains a Douyin URL. Douyin has no cookie field in the UI and does not read browser cookies; ClipFlow resolves public Douyin share data and passes the direct video URL to yt-dlp.
 
 Useful for:
 
@@ -153,6 +156,9 @@ clipflow/
 |   |   |-- common.py
 |   |   |-- registry.py
 |   |   |-- facebook/
+|   |   |   |-- service.py
+|   |   |   `-- views.py
+|   |   |-- douyin/
 |   |   |   |-- service.py
 |   |   |   `-- views.py
 |   |   |-- instagram/

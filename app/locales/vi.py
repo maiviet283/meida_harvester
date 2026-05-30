@@ -14,6 +14,10 @@ TEXT = {
             "name": "TikTok",
             "description": "Tải video ngắn, reel và quét toàn bộ video từ hồ sơ TikTok.",
         },
+        "douyin": {
+            "name": "Douyin",
+            "description": "Tải video Douyin Trung Quốc và gom toàn bộ video từ hồ sơ Douyin công khai.",
+        },
         "facebook": {
             "name": "Facebook",
             "description": "Tải video Facebook, Reels và quét video từ trang hoặc hồ sơ.",
@@ -119,6 +123,12 @@ TEXT = {
         "ffmpeg_missing": "Cần FFmpeg để ghép file video/audio cho link này. Hãy thêm FFmpeg vào thư mục ffmpeg hoặc PATH rồi tải lại.",
         "extractor_changed": "Facebook vừa đổi cấu trúc trang nên yt-dlp không đọc được link này. Hãy thử link video/reel khác hoặc cập nhật yt-dlp sau.",
         "login_required": "Nội dung này cần đăng nhập hoặc không công khai. Hiện app chỉ tải được link công khai.",
+        "douyin_single_link": "Link này không phải link video Douyin trực tiếp. Hãy dùng link dạng https://www.douyin.com/video/123456789.",
+        "douyin_page_link": "Link này không phải link hồ sơ Douyin. Hãy dùng link dạng https://www.douyin.com/user/SEC_UID.",
+        "douyin_profile_failed": "Douyin không trả dữ liệu hồ sơ cho link này. Hãy thử link hồ sơ công khai khác hoặc thử lại sau.",
+        "douyin_page_no_videos": "Không tìm thấy video công khai nào trên hồ sơ Douyin này.",
+        "douyin_resolve_failed": "Không mở được link rút gọn Douyin này. Hãy thử dán link đầy đủ hoặc thử lại sau.",
+        "douyin_extract_failed": "Douyin không trả dữ liệu video công khai cho link này. Hãy thử link công khai khác hoặc thử lại sau.",
         "facebook_single_link": "Link này không phải link video Facebook trực tiếp. Hãy dùng link dạng watch, videos, reel hoặc fb.watch.",
         "facebook_people_page": "Facebook profile dạng /people/... chưa tải toàn trang ổn định bằng yt-dlp. Hãy dùng link video/reel riêng lẻ hoặc link trang công khai có tab video.",
         "facebook_parse_failed": "Facebook không trả dữ liệu video cho link này. Hãy đăng nhập Facebook trên Edge/Chrome/Firefox của máy này, dùng link video/reel công khai, rồi thử lại.",
