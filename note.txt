@@ -10,3 +10,5 @@ python check.py
 
 python check.py --no-bump --no-build
  = kiểm tra nhanh.
+
+ python check.py --test-only
