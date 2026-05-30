@@ -152,6 +152,7 @@ class FacebookService(BaseDownloadService):
 
         progress("reading", 18, None)
         urls = self.collect_page_video_urls(url, progress)
+        urls = [u for u in urls if self.is_supported_video_url(u)]
         if not urls:
             raise UserFacingDownloadError("facebook_page_no_videos")
         self.download_urls(urls, folder, progress, single=False, page_filter="all", emit_initial_progress=False)
@@ -252,6 +253,7 @@ class FacebookService(BaseDownloadService):
 
         if not urls and not had_readable_page:
             raise UserFacingDownloadError("facebook_page_failed")
+        print(f"[Facebook] collect_page_video_urls → {len(urls)} URLs: {urls[:5]}")
         return urls
 
     def build_page_scan_urls(self, url: str) -> list[str]:
@@ -262,6 +264,20 @@ class FacebookService(BaseDownloadService):
             return []
 
         first_part = path_parts[0].lower()
+
+        if first_part == "profile.php":
+            profile_id = parse_qs(parsed.query).get("id", [""])[0]
+            if not profile_id.isdigit():
+                return []
+            return [
+                f"https://mbasic.facebook.com/profile.php?id={profile_id}&sk=reels",
+                f"https://mbasic.facebook.com/profile.php?id={profile_id}&sk=videos",
+                f"https://www.facebook.com/profile.php?id={profile_id}&sk=reels",
+                f"https://www.facebook.com/profile.php?id={profile_id}&sk=videos",
+                f"https://m.facebook.com/profile.php?id={profile_id}&sk=reels",
+                f"https://m.facebook.com/profile.php?id={profile_id}&sk=videos",
+            ]
+
         if first_part in {
             "watch",
             "video.php",
@@ -273,17 +289,17 @@ class FacebookService(BaseDownloadService):
             "groups",
             "events",
             "people",
-            "profile.php",
         }:
             return []
 
         page_slug = path_parts[0]
         return [
+            f"https://mbasic.facebook.com/{page_slug}/videos",
+            f"https://mbasic.facebook.com/{page_slug}/reels",
             f"https://www.facebook.com/{page_slug}/videos",
             f"https://www.facebook.com/{page_slug}/reels",
             f"https://m.facebook.com/{page_slug}/videos",
             f"https://m.facebook.com/{page_slug}/reels",
-            f"https://mbasic.facebook.com/{page_slug}/videos",
             f"https://www.facebook.com/{page_slug}/",
         ]
 
@@ -394,9 +410,13 @@ class FacebookService(BaseDownloadService):
             if "facebook.com" not in (parsed.hostname or "").lower():
                 continue
             lowered = resolved.lower()
-            if ("/videos" not in lowered and "/reels" not in lowered) or not any(
-                token in lowered for token in ("cursor", "after", "pagelet", "more", "sk=videos")
-            ):
+            is_slug_video_page = "/videos" in lowered or "/reels" in lowered
+            is_profile_video_page = "profile.php" in lowered and (
+                "sk=videos" in lowered or "sk=reels" in lowered
+            )
+            if not is_slug_video_page and not is_profile_video_page:
+                continue
+            if not any(token in lowered for token in ("cursor", "after", "start=", "pagelet", "more", "sk=videos", "end_cursor")):
                 continue
             next_urls.append(resolved)
         return next_urls
