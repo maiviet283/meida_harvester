@@ -96,7 +96,6 @@ class TikTokService(BaseDownloadService):
         on_video: "Callable[[dict], None] | None" = None,
         on_channel: "Callable[[dict], None] | None" = None,
     ) -> list[dict]:
-        # Phase 1 — fast flat listing to discover all video URLs + channel info
         progress("analyze_reading", 5, None)
         flat_opts: dict = {
             "quiet": True,
@@ -110,7 +109,6 @@ class TikTokService(BaseDownloadService):
 
         self.raise_if_cancelled()
 
-        # Emit channel metadata immediately after flat extraction
         if flat_info and on_channel:
             channel_info = {
                 "name": flat_info.get("uploader") or flat_info.get("channel") or "",
@@ -133,7 +131,6 @@ class TikTokService(BaseDownloadService):
 
         progress("analyze_video", 10, {"current": "0", "total": str(total)})
 
-        # Phase 2 — full extract per video to get hashtags + accurate stats
         full_opts: dict = {
             "quiet": True,
             "no_warnings": True,

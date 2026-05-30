@@ -168,5 +168,9 @@ app/
 - Khi thêm text UI mới: thêm key vào **cả hai** `vi.py` và `en.py` trước, rồi mới dùng trong code.
 - Không dùng chuỗi tiếng Anh hoặc tiếng Việt trực tiếp trong `setText()`, `setPlaceholderText()`, `setWindowTitle()`, `addButton()`, hay bất kỳ widget nào — trừ `objectName()` (dùng cho CSS) và giá trị kỹ thuật không phải UI.
 - Khi thêm màu hoặc style state mới, cập nhật `app/themes.py`.
-- Không thêm comment thừa. Chỉ comment khi logic thật sự khó hiểu.
+- Không thêm comment thừa. Chỉ comment khi logic thật sự khó hiểu (WHY, không phải WHAT).
+- **TUYỆT ĐỐI KHÔNG** viết module-level docstring `"""..."""` ở đầu file.
+- **TUYỆT ĐỐI KHÔNG** viết docstring trên class hoặc hàm trừ khi bắt buộc bởi public API — và khi cần thì chỉ 1 dòng tối đa.
+- **KHÔNG** viết comment dạng section-header trong hàm (`# Phase 1`, `# Stats`, `# Primary:`, `# Bottom toolbar:`, v.v.) — code tự nói chuyện qua tên biến/hàm.
+- **KHÔNG** để lại debug `print()` trong production code.
 - Không hard-code URL, màu trong file view.

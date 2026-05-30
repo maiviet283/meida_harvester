@@ -32,7 +32,6 @@ class YouTubeService(BaseDownloadService):
         if not self.has_ffmpeg():
             raise UserFacingDownloadError("ffmpeg_missing")
 
-        print(f"[YouTube] format: {YOUTUBE_HIGH_QUALITY_FORMAT}")
         options = self.base_yt_dlp_options(folder, hook, single)
         options.update(
             {
@@ -48,13 +47,11 @@ class YouTubeService(BaseDownloadService):
         if not self.is_supported_video_url(url):
             raise UserFacingDownloadError("youtube_single_link")
         url = self.normalize_video_url(url)
-        print(f"[YouTube] downloading single: {url}")
         super().download_single(url, folder, progress)
 
     def to_user_error(self, exc: DownloadError) -> UserFacingDownloadError:
         message = str(exc)
         lower_message = message.lower()
-        print(f"[YouTube] download error: {message}")
         if "age" in lower_message and ("restricted" in lower_message or "confirm" in lower_message):
             return UserFacingDownloadError("youtube_age_restricted")
         if "members" in lower_message or "member-only" in lower_message or "join this channel" in lower_message:

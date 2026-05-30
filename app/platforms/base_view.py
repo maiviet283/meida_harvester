@@ -362,7 +362,6 @@ class _NumericItem(QTableWidgetItem):
 
 
 _ANALYZE_COLS = ["rank", "title", "views", "likes", "comments", "shares", "engage", "duration", "hashtags", "date", "url"]
-# col indices
 _COL_RANK, _COL_TITLE, _COL_VIEWS, _COL_LIKES, _COL_COMMENTS, _COL_SHARES, _COL_ENGAGE, _COL_DURATION, _COL_HASHTAGS, _COL_DATE, _COL_URL = range(11)
 
 
@@ -487,7 +486,6 @@ class AnalysisPanel(QFrame):
         self.helper.setWordWrap(True)
         layout.addWidget(self.helper)
 
-        # URL input + action buttons in one row
         input_row = QHBoxLayout()
         input_row.setSpacing(10)
         self.url_input = QLineEdit()
@@ -519,12 +517,10 @@ class AnalysisPanel(QFrame):
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
 
-        # Filler: pushes content to top when no results are shown.
         self._filler = QWidget()
         self._filler.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         layout.addWidget(self._filler)
 
-        # Channel card — shown as soon as channel info arrives
         self._channel_card = QFrame()
         self._channel_card.setObjectName("channelCard")
         card_layout = QVBoxLayout(self._channel_card)
@@ -541,28 +537,24 @@ class AnalysisPanel(QFrame):
         self._channel_card.setVisible(False)
         layout.addWidget(self._channel_card)
 
-        # Stats — total views, avg, top
         self.stats = QLabel()
         self.stats.setObjectName("helperText")
         self.stats.setWordWrap(True)
         self.stats.setVisible(False)
         layout.addWidget(self.stats)
 
-        # Dates overview
         self._dates_label = QLabel()
         self._dates_label.setObjectName("overviewInfo")
         self._dates_label.setWordWrap(True)
         self._dates_label.setVisible(False)
         layout.addWidget(self._dates_label)
 
-        # Top hashtags
         self._hashtags_label = QLabel()
         self._hashtags_label.setObjectName("hashtagInfo")
         self._hashtags_label.setWordWrap(True)
         self._hashtags_label.setVisible(False)
         layout.addWidget(self._hashtags_label)
 
-        # Summary + chart button in one row
         summary_row = QHBoxLayout()
         self.summary = QLabel()
         self.summary.setObjectName("helperText")
@@ -593,7 +585,6 @@ class AnalysisPanel(QFrame):
         self.table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         layout.addWidget(self.table)
 
-        # Bottom toolbar: copy | reset | stretch | export
         bottom_row = QHBoxLayout()
         bottom_row.setSpacing(8)
 
@@ -764,7 +755,6 @@ class AnalysisPanel(QFrame):
             return
         videos = self._results
 
-        # Stats
         total_views = sum(v.get("view_count", 0) for v in videos)
         avg_views = total_views // len(videos) if videos else 0
         max_views = videos[0].get("view_count", 0) if videos else 0
@@ -774,7 +764,6 @@ class AnalysisPanel(QFrame):
             max_views=_fmt_count(max_views),
         ))
 
-        # Dates
         date_stats = _compute_date_stats(videos)
         if date_stats:
             self._dates_label.setText(self.t("analyze.dates_info",
@@ -785,7 +774,6 @@ class AnalysisPanel(QFrame):
         else:
             self._dates_label.setText(self.t("analyze.dates_no_data"))
 
-        # Top hashtags
         top_tags = _compute_top_hashtags(videos)
         if top_tags:
             parts = [self.t("analyze.hashtag_item", tag=tag, count=str(count))
@@ -795,7 +783,6 @@ class AnalysisPanel(QFrame):
         else:
             self._hashtags_label.setText("")
 
-        # Summary
         self.summary.setText(self.t("analyze.summary", count=str(len(videos))))
         self._chart_btn.setText(self.t("analyze.view_chart"))
 
@@ -803,7 +790,7 @@ class AnalysisPanel(QFrame):
         if not self._results:
             return
         try:
-            from matplotlib.figure import Figure  # noqa: F401  just check import
+            from matplotlib.figure import Figure  # noqa: F401
         except ImportError:
             dialog = QMessageBox(self)
             dialog.setWindowTitle(self.t("analyze.chart_title"))
@@ -832,7 +819,6 @@ class AnalysisPanel(QFrame):
         if not self._results:
             return
 
-        # Sort by views, rebuild table with correct ranks
         self._results = sorted(self._results, key=lambda v: v.get("view_count") or 0, reverse=True)
         self._populate_table(self._results)
         self.export_btn.setEnabled(True)
@@ -905,7 +891,6 @@ class AnalysisPanel(QFrame):
             self.table.resizeColumnToContents(col)
         self.table.setColumnWidth(_COL_HASHTAGS, 180)
         self.table.setColumnWidth(_COL_URL, 280)
-        # Title column stretches to fill remaining space
         self.table.horizontalHeader().setSectionResizeMode(_COL_TITLE, QHeaderView.ResizeMode.Stretch)
 
     def _on_selection_changed(self) -> None:
@@ -1036,7 +1021,6 @@ class ChartDialog(QDialog):
         cmts   = [v.get("comment_count", 0) for v in datable]
         shares = [v.get("repost_count", 0) for v in datable]
 
-        # Moving average of views
         win = max(3, len(views) // 5)
         avg_v = [sum(views[max(0, i - win + 1):i + 1]) / min(win, i + 1) for i in range(len(views))]
 
@@ -1048,13 +1032,11 @@ class ChartDialog(QDialog):
 
         ms = max(2, min(5, 80 // len(datable)))
 
-        # Primary axis: views + moving average
         ax1.plot(x, views, color="#4f7cff", lw=1.8, marker="o", ms=ms,
                  label=self.t("analyze.chart_line_views"))
         ax1.plot(x, avg_v, color="#7ca8e0", lw=3.0, ls="--",
                  label=self.t("analyze.chart_line_avg"))
 
-        # Secondary axis: likes, comments, shares
         ax2.plot(x, likes,  color="#f87171", lw=1.5, marker="o", ms=ms,
                  label=self.t("analyze.chart_line_likes"))
         ax2.plot(x, cmts,   color="#4ade80", lw=1.5, marker="s", ms=ms,
@@ -1062,7 +1044,6 @@ class ChartDialog(QDialog):
         ax2.plot(x, shares, color="#fb923c", lw=1.5, marker="^", ms=ms,
                  label=self.t("analyze.chart_line_shares"))
 
-        # X ticks
         step = max(1, len(dates) // 12)
         ticks = list(range(0, len(dates), step))
         ax1.set_xticks(ticks)
@@ -1081,7 +1062,6 @@ class ChartDialog(QDialog):
         for spine in list(ax1.spines.values()) + list(ax2.spines.values()):
             spine.set_edgecolor(grid_c)
 
-        # Combined legend
         h1, l1 = ax1.get_legend_handles_labels()
         h2, l2 = ax2.get_legend_handles_labels()
         ax1.legend(h1 + h2, l1 + l2,

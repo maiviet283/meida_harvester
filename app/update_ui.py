@@ -9,7 +9,6 @@ from app.version import APP_VERSION
 
 
 def trigger_update_check(language: str) -> None:
-    """Kiểm tra cập nhật thủ công khi user nhấn nút. Không chặn nếu không có update."""
     try:
         update_check = check_for_update()
     except UpdateError as exc:

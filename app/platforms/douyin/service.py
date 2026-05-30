@@ -323,20 +323,17 @@ class DouyinService(BaseDownloadService):
         seen_video_ids: set[str] = set()
         last_error: UserFacingDownloadError | None = None
 
-        # Primary: iesdouyin.com share user page (no cookies, same approach as single video)
         try:
             self.collect_profile_share_video_urls(sec_uid, urls, seen_video_ids, progress)
         except UserFacingDownloadError as exc:
             last_error = exc
 
-        # Secondary: Douyin API (works with cookies, falls back to empty if none)
         if not urls:
             try:
                 self.collect_profile_api_video_urls(sec_uid, url, urls, seen_video_ids, progress)
             except UserFacingDownloadError as exc:
                 last_error = exc
 
-        # Tertiary: desktop profile HTML scraping
         if not urls:
             try:
                 page_html = self.fetch_profile_html(url)

@@ -1,15 +1,3 @@
-"""
-License validation for ClipFlow.
-
-Luồng:
-  1. validate() — gọi khi khởi động
-       cache còn hạn  → trả "ok" ngay, không gọi server
-       cache hết hạn  → gọi /licenses/validate/, cập nhật cache
-       chưa activate  → trả "not_found"
-       server offline → gia hạn cache thêm 1h, trả "ok" (grace period)
-  2. activate(key) — gọi khi user nhập key lần đầu
-       thành công → lưu device_token vào cache, trả "ok"
-"""
 from __future__ import annotations
 
 import base64
@@ -125,10 +113,6 @@ def _post(endpoint: str, body: dict) -> tuple[int, dict]:
 
 
 def activate(key: str) -> tuple[LicenseStatus, str]:
-    """
-    Kích hoạt key lần đầu.
-    Returns: ("ok", device_token) hoặc (error_status, "").
-    """
     hwid = get_hwid()
     code, resp = _post("activate/", {"key": key.strip().upper(), "hwid": hwid})
 
@@ -149,10 +133,6 @@ def activate(key: str) -> tuple[LicenseStatus, str]:
 
 
 def validate() -> LicenseStatus:
-    """
-    Kiểm tra trạng thái license hiện tại.
-    Dùng cache nếu còn hạn, không thì gọi server.
-    """
     hwid = get_hwid()
     data = _read_cache(hwid)
 
@@ -163,7 +143,6 @@ def validate() -> LicenseStatus:
     if not device_token:
         return "not_found"
 
-    # Kiểm tra local expiry (subscription)
     expires_at_str: str = data.get("expires_at", "")
     if expires_at_str:
         try:
@@ -176,7 +155,6 @@ def validate() -> LicenseStatus:
         except ValueError:
             pass
 
-    # Kiểm tra cache còn hạn 24h không
     cached_until_str: str = data.get("cached_until", "")
     if cached_until_str:
         try:
@@ -188,11 +166,9 @@ def validate() -> LicenseStatus:
         except ValueError:
             pass
 
-    # Cache hết hạn — gọi server
     code, resp = _post("validate/", {"device_token": device_token, "hwid": hwid})
 
     if code == 0:
-        # Server offline — grace period 1h, cho qua
         data["cached_until"] = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
         _write_cache(data, hwid)
         return "ok"

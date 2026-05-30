@@ -7,13 +7,6 @@ _SERVER_KEY = "ClipFlow-SingleInstance-v1"
 
 
 class SingleInstanceGuard:
-    """
-    Đảm bảo chỉ có một instance app chạy.
-    - Instance đầu tiên: tạo server, chạy bình thường.
-    - Instance thứ hai: gửi tín hiệu "activate" tới instance đầu rồi thoát.
-    Instance đầu nhận tín hiệu → đưa cửa sổ lên foreground.
-    """
-
     def __init__(self) -> None:
         self._server: QLocalServer | None = None
         self._is_primary = self._try_become_primary()

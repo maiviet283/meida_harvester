@@ -1,14 +1,3 @@
-"""
-License gate UI cho ClipFlow.
-
-ensure_license_allowed() — gọi trong main() trước khi hiện cửa sổ chính.
-  - "ok"             → True (tiếp tục)
-  - "not_found"      → hiện dialog nhập key, trả True nếu activate thành công
-  - "expired"        → hiện thông báo hết hạn, trả False
-  - "revoked"        → hiện thông báo bị thu hồi, trả False
-  - "device_mismatch"→ hiện thông báo đổi máy, trả False
-  - "offline"        → xảy ra khi không có cache + server offline, trả False
-"""
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt
@@ -138,10 +127,6 @@ _BLOCK_MESSAGES: dict[str, tuple[str, str]] = {
 
 
 def ensure_license_allowed() -> bool:
-    """
-    Trả True nếu license hợp lệ và app được phép chạy.
-    Trả False nếu bị chặn — main() nên gọi sys.exit(0).
-    """
     status: LicenseStatus = validate()
 
     if status == "ok":
