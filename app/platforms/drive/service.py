@@ -30,6 +30,7 @@ _TITLE_SUFFIX_RE = re.compile(r"\s*\(DRIVE\s+[\d.]+\)\s*$", re.IGNORECASE)
 _TITLE_EXT_RE = re.compile(r"\.(mp4|mkv|mov|webm|avi|m4v|wmv)$", re.IGNORECASE)
 _MIME_CODECS_RE = re.compile(r'codecs="([^"]+)"')
 _CHUNK_SIZE = 10 << 20
+_MAX_URL_REFRESH = 5
 
 
 class _IPv4HTTPSConnection(http.client.HTTPSConnection):
@@ -126,15 +127,15 @@ class DriveDownloadService(BaseDownloadService):
         basename = self._build_output_basename(info["title"], info["id"])
 
         if progressive is not None:
-            self._download_to_file(progressive["url"], target_dir / f"{basename}.{progressive['ext']}", progress, 25, 100)
+            self._download_to_file(info["id"], progressive, target_dir / f"{basename}.{progressive['ext']}", progress, 25, 100)
             return
 
         if video is not None and audio is not None and self.has_ffmpeg():
             video_path = target_dir / f"{basename}.video.{video['ext']}"
             audio_path = target_dir / f"{basename}.audio.{audio['ext']}"
             try:
-                self._download_to_file(video["url"], video_path, progress, 25, 68)
-                self._download_to_file(audio["url"], audio_path, progress, 68, 90)
+                self._download_to_file(info["id"], video, video_path, progress, 25, 68)
+                self._download_to_file(info["id"], audio, audio_path, progress, 68, 90)
                 progress("processing", 93, None)
                 self._merge_streams(video_path, audio_path, target_dir / f"{basename}.mp4")
             finally:
@@ -143,14 +144,15 @@ class DriveDownloadService(BaseDownloadService):
             return
 
         if video is not None:
-            self._download_to_file(video["url"], target_dir / f"{basename}.{video['ext']}", progress, 25, 100)
+            self._download_to_file(info["id"], video, target_dir / f"{basename}.{video['ext']}", progress, 25, 100)
             return
 
         raise UserFacingDownloadError("drive_no_video")
 
     def _download_to_file(
         self,
-        url: str,
+        file_id: str,
+        fmt: dict,
         path: Path,
         progress: ProgressCallback,
         start_pct: int,
@@ -159,8 +161,11 @@ class DriveDownloadService(BaseDownloadService):
         self.raise_if_cancelled()
         opener = urllib.request.build_opener(_IPv4HTTPSHandler())
         span = max(1, end_pct - start_pct)
+        url = fmt["url"]
+        format_id = fmt.get("format_id")
         position = 0
         total: int | None = None
+        refreshes = 0
         try:
             with open(path, "wb") as output:
                 while True:
@@ -171,10 +176,20 @@ class DriveDownloadService(BaseDownloadService):
                         "Range": f"bytes={position}-{position + _CHUNK_SIZE - 1}",
                     }
                     request = urllib.request.Request(url, headers=headers)
-                    with opener.open(request, timeout=60) as response:
-                        if total is None:
-                            total = self._content_range_total(response.headers.get("Content-Range"))
-                        data = response.read()
+                    try:
+                        with opener.open(request, timeout=60) as response:
+                            if total is None:
+                                total = self._content_range_total(response.headers.get("Content-Range"))
+                            data = response.read()
+                    except urllib.error.HTTPError as exc:
+                        if exc.code not in (401, 403, 410) or refreshes >= _MAX_URL_REFRESH:
+                            raise
+                        fresh_url = self._refresh_stream_url(file_id, format_id)
+                        if not fresh_url:
+                            raise
+                        url = fresh_url
+                        refreshes += 1
+                        continue
                     if not data:
                         break
                     output.write(data)
@@ -188,12 +203,24 @@ class DriveDownloadService(BaseDownloadService):
             raise UserFacingDownloadError("download_cancelled")
         except urllib.error.HTTPError as exc:
             path.unlink(missing_ok=True)
-            if exc.code in (401, 403):
+            if exc.code in (401, 403, 410):
                 raise UserFacingDownloadError("drive_permission_denied") from exc
             raise UserFacingDownloadError("drive_no_video") from exc
         except Exception as exc:
             path.unlink(missing_ok=True)
             raise UserFacingDownloadError("download_failed", {"error": str(exc)}) from exc
+
+    def _refresh_stream_url(self, file_id: str, format_id: str | None) -> str | None:
+        if not format_id:
+            return None
+        try:
+            info = self._fetch_video_metadata(file_id, self._file_url(file_id))
+        except UserFacingDownloadError:
+            return None
+        for fmt in info["formats"]:
+            if fmt.get("format_id") == format_id:
+                return fmt.get("url")
+        return None
 
     @staticmethod
     def _content_range_total(content_range: str | None) -> int | None:

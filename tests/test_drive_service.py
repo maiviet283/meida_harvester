@@ -2,13 +2,48 @@ from __future__ import annotations
 
 import json
 import socket
+import tempfile
 import unittest
+import urllib.error
 import urllib.parse
 from pathlib import Path
 from unittest.mock import patch
 
+from app.platforms.drive import service as drive_service
 from app.platforms.drive.service import CONFIG, DriveDownloadService, _IPv4HTTPSConnection
 from app.platforms.common import UserFacingDownloadError
+
+
+class _FakeResponse:
+    def __init__(self, data: bytes, content_range: str | None = None) -> None:
+        self._data = data
+        self.headers = {"Content-Range": content_range} if content_range else {}
+
+    def __enter__(self) -> "_FakeResponse":
+        return self
+
+    def __exit__(self, *args) -> bool:
+        return False
+
+    def read(self) -> bytes:
+        return self._data
+
+
+class _FakeOpener:
+    def __init__(self, behaviors: list) -> None:
+        self.behaviors = behaviors
+        self.calls = 0
+
+    def open(self, request, timeout=None):
+        behavior = self.behaviors[min(self.calls, len(self.behaviors) - 1)]
+        self.calls += 1
+        if isinstance(behavior, Exception):
+            raise behavior
+        return behavior
+
+
+def _http_403() -> urllib.error.HTTPError:
+    return urllib.error.HTTPError("https://video.example/x", 403, "Forbidden", {}, None)
 
 
 def _video_info_body(player_response: dict, status: str = "ok", **extra: str) -> str:
@@ -125,8 +160,8 @@ class DriveServiceTest(unittest.TestCase):
         ]}
         calls: list[tuple[str, str]] = []
 
-        def fake_download(url, path, progress, start, end):
-            calls.append((url, path.name))
+        def fake_download(file_id, fmt, path, progress, start, end):
+            calls.append((fmt["url"], path.name))
 
         with patch.object(service, "_download_to_file", side_effect=fake_download):
             service._download_streams(info, "downloads", lambda *a: None)
@@ -147,7 +182,7 @@ class DriveServiceTest(unittest.TestCase):
         merged: list[str] = []
 
         with patch.object(service, "has_ffmpeg", return_value=True), patch.object(
-            service, "_download_to_file", side_effect=lambda url, *a: downloaded.append(url)
+            service, "_download_to_file", side_effect=lambda file_id, fmt, *a: downloaded.append(fmt["url"])
         ), patch.object(service, "_merge_streams", side_effect=lambda *a: merged.append("merged")):
             service._download_streams(info, "downloads", lambda *a: None)
 
@@ -214,6 +249,85 @@ class DriveServiceTest(unittest.TestCase):
         self.assertNotIn("/", name)
         self.assertNotIn(":", name)
         self.assertTrue(name.endswith("[FILE_ID]"))
+
+    def test_download_to_file_refreshes_url_on_403_and_resumes(self) -> None:
+        service = DriveDownloadService()
+        opener = _FakeOpener([_http_403(), _FakeResponse(b"video-bytes")])
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "clip.mp4"
+            with patch.object(drive_service.urllib.request, "build_opener", return_value=opener), patch.object(
+                service, "_refresh_stream_url", return_value="https://video.example/fresh"
+            ) as refresh:
+                service._download_to_file(
+                    "FILE_ID",
+                    {"url": "https://video.example/stale", "format_id": "37"},
+                    path,
+                    lambda *a: None,
+                    25,
+                    100,
+                )
+
+            refresh.assert_called_once_with("FILE_ID", "37")
+            self.assertEqual(path.read_bytes(), b"video-bytes")
+
+    def test_download_to_file_resumes_from_correct_offset_after_403(self) -> None:
+        service = DriveDownloadService()
+        opener = _FakeOpener([
+            _FakeResponse(b"AAAA", "bytes 0-3/8"),
+            _http_403(),
+            _FakeResponse(b"BBBB"),
+        ])
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "clip.mp4"
+            with patch.object(drive_service, "_CHUNK_SIZE", 4), patch.object(
+                drive_service.urllib.request, "build_opener", return_value=opener
+            ), patch.object(service, "_refresh_stream_url", return_value="https://video.example/fresh"):
+                service._download_to_file(
+                    "FILE_ID",
+                    {"url": "https://video.example/stale", "format_id": "37"},
+                    path,
+                    lambda *a: None,
+                    25,
+                    100,
+                )
+
+            self.assertEqual(path.read_bytes(), b"AAAABBBB")
+
+    def test_download_to_file_gives_up_after_max_refreshes(self) -> None:
+        service = DriveDownloadService()
+        opener = _FakeOpener([_http_403()])
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "clip.mp4"
+            with patch.object(drive_service.urllib.request, "build_opener", return_value=opener), patch.object(
+                service, "_refresh_stream_url", return_value="https://video.example/fresh"
+            ) as refresh:
+                with self.assertRaises(UserFacingDownloadError) as context:
+                    service._download_to_file(
+                        "FILE_ID",
+                        {"url": "https://video.example/stale", "format_id": "37"},
+                        path,
+                        lambda *a: None,
+                        25,
+                        100,
+                    )
+
+            self.assertEqual(context.exception.status_key, "drive_permission_denied")
+            self.assertEqual(refresh.call_count, drive_service._MAX_URL_REFRESH)
+            self.assertFalse(path.exists())
+
+    def test_refresh_stream_url_returns_matching_format_url(self) -> None:
+        service = DriveDownloadService()
+        info = {"formats": [
+            {"format_id": "140", "url": "https://video.example/audio"},
+            {"format_id": "37", "url": "https://video.example/fresh37"},
+        ]}
+
+        with patch.object(service, "_fetch_video_metadata", return_value=info):
+            self.assertEqual(service._refresh_stream_url("FILE_ID", "37"), "https://video.example/fresh37")
+            self.assertIsNone(service._refresh_stream_url("FILE_ID", "999"))
 
     def test_extracts_folder_file_ids_from_drive_html(self) -> None:
         html = r'''
