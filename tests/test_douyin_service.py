@@ -98,7 +98,7 @@ class DouyinServiceTest(unittest.TestCase):
         )
         self.assertFalse(CONFIG.supports_page_filters)
         self.assertFalse(CONFIG.supports_analysis)
-        self.assertFalse(CONFIG.supports_manual_cookies)
+        self.assertTrue(CONFIG.supports_manual_cookies)
 
     def test_page_input_cleans_douyin_profile_urls_to_canonical_page(self) -> None:
         service = DouyinService()

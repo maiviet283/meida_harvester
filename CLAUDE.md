@@ -123,7 +123,7 @@ app/
 - Có nút đổi sáng/tối và nút đổi Việt/Anh.
 - Dialog thoát dùng text từ locale và màu từ theme.
 - Tab `Tải video` / `Tải cả trang` dùng style dạng pill/segmented control.
-- Facebook và Instagram có ô dán cookie đăng nhập, ẩn nội dung nhập, nút hướng dẫn lấy cookie bằng CookiePeek, tự đồng bộ cookie giữa hai tab, lưu lại local cho lần sau.
+- Facebook, Instagram và Douyin có ô dán cookie đăng nhập, ẩn nội dung nhập, nút hướng dẫn lấy cookie bằng CookiePeek, tự đồng bộ cookie giữa hai tab, lưu lại local cho lần sau.
 - Tab `Tải cả trang` của mọi nền tảng có nút `Dừng` khi đang tải.
 - Không hiển thị thông tin giả trên trang nền tảng.
 - Khu vực tải dùng progress bar và status text thân thiện, không hiển thị log kỹ thuật.
@@ -141,6 +141,7 @@ app/
 - `Tải video`: 1 link, 1 video, không phân biệt ngắn/dài.
 - `Tải cả trang`:
   - TikTok: tải toàn profile; bỏ qua slideshow không có video track.
+  - Douyin: tải toàn profile qua API `/aweme/v1/web/aweme/post/` (phân trang); **yêu cầu cookie phiên** dán trong UI — Douyin trả body rỗng nếu không có cookie (không cần `a_bogus` khi đã có cookie). Bỏ qua slideshow/ảnh. Video đơn vẫn tải không cần cookie qua trang share.
   - Instagram: dùng API profile + clips + feed riêng; dùng Clips API (`/api/v1/clips/user/`) làm nguồn chính cho Reels; bỏ qua carousel/ảnh/post giới hạn audience; ưu tiên Full HD ≤ 1920px, H.264+AAC/M4A; ưu tiên cookie UI → browser (Firefox/Edge/Chrome); retry không cookie nếu DPAPI lỗi.
   - Facebook: quét HTML trang/videos/reels để gom link trước khi gọi `yt-dlp`; tự đọc cookie browser; ưu tiên cookie UI; retry không cookie nếu DPAPI lỗi; chặn link `/people/...`.
   - YouTube: tải toàn kênh/playlist.
