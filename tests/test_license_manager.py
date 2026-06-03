@@ -33,6 +33,30 @@ class GetHwidTest(unittest.TestCase):
     def test_is_deterministic_across_calls(self) -> None:
         self.assertEqual(lm.get_hwid(), lm.get_hwid())
 
+    def test_uses_machine_guid_when_available(self) -> None:
+        import platform
+        with patch.object(lm, "_windows_machine_guid", return_value="MACHINE-GUID-1234"):
+            expected = hashlib.sha256(
+                f"MACHINE-GUID-1234|{platform.machine()}|{platform.system()}".encode()
+            ).hexdigest()[:32]
+            self.assertEqual(lm.get_hwid(), expected)
+
+    def test_machine_guid_independent_of_network_adapter(self) -> None:
+        with patch.object(lm, "_windows_machine_guid", return_value="STABLE-GUID"):
+            with patch("uuid.getnode", return_value=0x111111111111):
+                first = lm.get_hwid()
+            with patch("uuid.getnode", return_value=0x999999999999):
+                second = lm.get_hwid()
+        self.assertEqual(first, second)
+
+    def test_falls_back_to_mac_when_machine_guid_missing(self) -> None:
+        with patch.object(lm, "_windows_machine_guid", return_value=None):
+            with patch("uuid.getnode", return_value=0x1111), patch("platform.processor", return_value="cpu"):
+                fallback = lm.get_hwid()
+            with patch("uuid.getnode", return_value=0x2222), patch("platform.processor", return_value="cpu"):
+                different = lm.get_hwid()
+        self.assertNotEqual(fallback, different)
+
 
 class XorTest(unittest.TestCase):
     def test_round_trip_restores_original_bytes(self) -> None:

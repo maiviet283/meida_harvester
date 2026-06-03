@@ -24,7 +24,7 @@ Thứ tự khởi động trong `app/main_window.py → main()`:
 
 ### License System
 - **`app/license_manager.py`** — toàn bộ logic license, không phụ thuộc Qt:
-  - `get_hwid()` — fingerprint máy bằng `sha256(node|machine|system|processor)[:32]`
+  - `get_hwid()` — fingerprint máy bằng `sha256(MachineGuid|machine|system)[:32]`. Trên Windows ưu tiên `MachineGuid` (registry `HKLM\SOFTWARE\Microsoft\Cryptography`, đọc qua `winreg`, không cần admin) vì ổn định khi đổi mạng/card/adapter ảo; chỉ fallback về `uuid.getnode()` (MAC) + `processor` khi không đọc được MachineGuid (non-Windows).
   - `activate(key)` — gọi `POST /licenses/activate/` với `{key, hwid}`, nhận `device_token`, lưu cache local
   - `validate()` — kiểm tra license; dùng cache nếu còn hạn 24h, gọi server nếu hết hạn, grace period 1h nếu server offline
   - Cache lưu tại `%APPDATA%\ClipFlow\session.dat`, XOR-encrypt bằng HMAC-derived key từ HWID rồi base64. **Không lưu key gốc** — chỉ lưu `device_token`.

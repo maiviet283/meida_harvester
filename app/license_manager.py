@@ -32,12 +32,36 @@ LicenseStatus = Literal[
 ]
 
 
+def _windows_machine_guid() -> str | None:
+    try:
+        import winreg
+    except ImportError:
+        return None
+    try:
+        key = winreg.OpenKey(
+            winreg.HKEY_LOCAL_MACHINE,
+            r"SOFTWARE\Microsoft\Cryptography",
+            0,
+            winreg.KEY_READ | winreg.KEY_WOW64_64KEY,
+        )
+        try:
+            value, _ = winreg.QueryValueEx(key, "MachineGuid")
+        finally:
+            winreg.CloseKey(key)
+    except OSError:
+        return None
+    value = str(value).strip()
+    return value or None
+
+
 def get_hwid() -> str:
-    node = str(uuid.getnode())
     machine = platform.machine()
     system = platform.system()
-    processor = (platform.processor() or "")[:32]
-    raw = f"{node}|{machine}|{system}|{processor}"
+    stable_id = _windows_machine_guid()
+    if not stable_id:
+        processor = (platform.processor() or "")[:32]
+        stable_id = f"{uuid.getnode()}|{processor}"
+    raw = f"{stable_id}|{machine}|{system}"
     return hashlib.sha256(raw.encode()).hexdigest()[:32]
 
 
