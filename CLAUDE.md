@@ -36,7 +36,7 @@ Thứ tự khởi động trong `app/main_window.py → main()`:
 
 ### Update System
 - `app/updater.py` — fetch manifest, parse version, download zip, launch PowerShell self-update script.
-- `app/update_ui.py` — UI layer: `ensure_update_allowed()` chặn nếu version cũ, `trigger_update_check()` cho nút manual.
+- `app/update_ui.py` — UI layer: `ensure_update_allowed()` chặn nếu server xác nhận version quá cũ (`required`), nhưng **fail-open** khi không kiểm được do mạng/server lỗi (trả `True` để không phạt oan khách offline / lúc Render ngủ). `trigger_update_check()` cho nút manual (vẫn báo lỗi khi check thất bại vì là hành động chủ động của user).
 - Manifest được proxy qua backend Render (`/licenses/version/`) thay vì gọi GitHub raw trực tiếp.
 - Self-update chỉ chạy trên bản `.exe` đã build (`is_packaged_app()`), không chạy khi dev.
 - Mỗi lần `check.py --publish` đều set cả `latest_version` lẫn `minimum_supported_version` bằng version mới → mọi bản cũ đều bị force-update.

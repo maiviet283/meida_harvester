@@ -34,13 +34,8 @@ def ensure_update_allowed(language: str, _prefetched: UpdateCheck | None = None)
     if _prefetched is None:
         try:
             _prefetched = check_for_update()
-        except UpdateError as exc:
-            QMessageBox.critical(
-                None,
-                translate(language, "update.check_failed_title"),
-                translate(language, "update.check_failed_message", error=str(exc)),
-            )
-            return False
+        except UpdateError:
+            return True  # không kiểm được do mạng/server: cho qua, chỉ chặn khi server xác nhận bản quá cũ
 
     update_check = _prefetched
     if not update_check.available and not update_check.required:
