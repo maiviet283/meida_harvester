@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt, QUrl
+from PyQt6.QtGui import QDesktopServices, QFont
 from PyQt6.QtWidgets import (
     QApplication,
     QDialog,
@@ -13,13 +13,15 @@ from PyQt6.QtWidgets import (
 )
 
 from app.license_manager import LicenseStatus, activate, validate
+from app.locales import translate
+from app.version import BUY_KEY_URL
 
 
 class _ActivateDialog(QDialog):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("ClipFlow — Kích hoạt")
-        self.setFixedSize(440, 260)
+        self.setFixedSize(440, 300)
         self.setWindowFlags(
             self.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint
         )
@@ -62,6 +64,18 @@ class _ActivateDialog(QDialog):
         self._btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._btn.clicked.connect(self._on_activate)
         layout.addWidget(self._btn)
+
+        self._buy_btn = QPushButton(translate("vi", "license.buy_key"))
+        self._buy_btn.setFixedHeight(38)
+        self._buy_btn.setStyleSheet(
+            "background:#16a34a; color:#fff; border-radius:8px; font-weight:700; font-size:13px;"
+        )
+        self._buy_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._buy_btn.clicked.connect(self._on_buy_key)
+        layout.addWidget(self._buy_btn)
+
+    def _on_buy_key(self) -> None:
+        QDesktopServices.openUrl(QUrl(BUY_KEY_URL))
 
     def _on_activate(self) -> None:
         key = self._key_input.text().strip()

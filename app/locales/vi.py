@@ -4,6 +4,7 @@ TEXT = {
         "brand": "ClipFlow",
         "subtitle": "Trình tải media đa nền tảng",
         "check_update": "Cập nhật",
+        "buy_key": "Mua key",
         "theme_light": "Sáng",
         "theme_dark": "Tối",
         "language_vi": "VI",
@@ -239,6 +240,7 @@ TEXT = {
     "license": {
         "gate_title": "Kích hoạt ClipFlow",
         "gate_desc": "Nhập license key để bắt đầu sử dụng.",
+        "buy_key": "Mua key",
         "err_not_found": "Key không tồn tại. Kiểm tra lại hoặc liên hệ hỗ trợ.",
         "err_expired": "Key đã hết hạn. Vui lòng gia hạn để tiếp tục.",
         "err_revoked": "Key đã bị thu hồi. Liên hệ hỗ trợ để biết thêm.",

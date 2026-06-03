@@ -4,6 +4,7 @@ TEXT = {
         "brand": "ClipFlow",
         "subtitle": "Universal media downloader",
         "check_update": "Updates",
+        "buy_key": "Buy key",
         "theme_light": "Light",
         "theme_dark": "Dark",
         "language_vi": "VI",
@@ -239,6 +240,7 @@ TEXT = {
     "license": {
         "gate_title": "Activate ClipFlow",
         "gate_desc": "Enter your license key to get started.",
+        "buy_key": "Buy key",
         "err_not_found": "Key not found. Double-check or contact support.",
         "err_expired": "Key has expired. Please renew to continue.",
         "err_revoked": "Key has been revoked. Contact support for details.",

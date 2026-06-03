@@ -32,6 +32,7 @@ THEMES = {
         "dialog_bg": "#ffffff",
         "dialog_text": "#101828",
         "success": "#16a34a",
+        "success_hover": "#15803d",
         "warning": "#f59e0b",
         "icon_bg": "#ffffff",
         "icon_mark": "#2563eb",
@@ -66,6 +67,7 @@ THEMES = {
         "dialog_bg": "#151d2c",
         "dialog_text": "#eef4ff",
         "success": "#22c55e",
+        "success_hover": "#16a34a",
         "warning": "#fbbf24",
         "icon_bg": "#111827",
         "icon_mark": "#6d92ff",
@@ -284,6 +286,18 @@ def build_stylesheet(theme_name: str) -> str:
         QPushButton#sidebarUpdateButton:hover {{
             background: {theme["sidebar_hover"]};
             color: {theme["sidebar_text"]};
+        }}
+        QPushButton#sidebarBuyButton {{
+            background: {theme["success"]};
+            color: {theme["primary_text"]};
+            border: none;
+            border-radius: 6px;
+            padding: 4px 12px;
+            font-size: 12px;
+            font-weight: 700;
+        }}
+        QPushButton#sidebarBuyButton:hover {{
+            background: {theme["success_hover"]};
         }}
         QMessageBox {{
             background: {theme["dialog_bg"]};

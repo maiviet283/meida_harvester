@@ -3,8 +3,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QPen, QPixmap
+from PyQt6.QtCore import Qt, QUrl
+from PyQt6.QtGui import QColor, QDesktopServices, QFont, QIcon, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import (
     QApplication,
     QFrame,
@@ -26,7 +26,7 @@ from app.platforms.registry import PLATFORM_MODULES
 from app.single_instance import SingleInstanceGuard
 from app.themes import build_stylesheet, get_theme
 from app.update_ui import ensure_update_allowed, trigger_update_check
-from app.version import APP_VERSION
+from app.version import APP_VERSION, BUY_KEY_URL
 
 
 class MainWindow(QMainWindow):
@@ -91,6 +91,12 @@ class MainWindow(QMainWindow):
         self.footer.setObjectName("sidebarFooter")
         footer_row.addWidget(self.footer, 1)
 
+        self.buy_btn = QPushButton()
+        self.buy_btn.setObjectName("sidebarBuyButton")
+        self.buy_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.buy_btn.clicked.connect(self.open_buy_key)
+        footer_row.addWidget(self.buy_btn)
+
         self.update_btn = QPushButton()
         self.update_btn.setObjectName("sidebarUpdateButton")
         self.update_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -151,6 +157,9 @@ class MainWindow(QMainWindow):
     def check_for_updates(self) -> None:
         trigger_update_check(self.language)
 
+    def open_buy_key(self) -> None:
+        QDesktopServices.openUrl(QUrl(BUY_KEY_URL))
+
     def toggle_theme(self) -> None:
         self.theme_name = "dark" if self.theme_name == "light" else "light"
         self.apply_theme()
@@ -165,6 +174,7 @@ class MainWindow(QMainWindow):
         self.brand.setText(self.t("app.brand"))
         self.subtitle.setText(self.t("app.subtitle"))
         self.footer.setText(f"ClipFlow {APP_VERSION}")
+        self.buy_btn.setText(self.t("app.buy_key"))
         self.update_btn.setText(self.t("app.check_update"))
         self.theme_btn.setText(
             self.t("app.theme_dark") if self.theme_name == "light" else self.t("app.theme_light")
