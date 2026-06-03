@@ -107,6 +107,9 @@ app/
     |-- douyin/
     |   |-- service.py
     |   `-- views.py
+    |-- drive/
+    |   |-- service.py
+    |   `-- views.py
     |-- facebook/
     |   |-- service.py
     |   `-- views.py
@@ -146,6 +149,7 @@ app/
 - `Tải cả trang`:
   - TikTok: tải toàn profile; bỏ qua slideshow không có video track.
   - Douyin: tải 1 video bằng trang share mobile công khai của Douyin (`www.iesdouyin.com/share/video/<id>/`), parse `window._ROUTER_DATA` để lấy URL video trực tiếp rồi đưa cho `yt-dlp`; nhận link video trực tiếp, profile URL kèm `modal_id`, short link `v.douyin.com`, hoặc cả đoạn text share có chứa link; tab tải toàn trang tự canonical hóa profile về `https://www.douyin.com/user/<SEC_UID>` rồi gom URL video từ API/web HTML Douyin và tải từng video; nếu Douyin trả captcha/body rỗng cho profile thì báo lỗi thân thiện `douyin_profile_failed`; ưu tiên H.264+AAC giống TikTok; không hiển thị ô cookie và không tự đọc cookie browser.
+  - Drive: `Tải video` nhận link file Google Drive (`/file/d/`, `/open?id=`, `/uc?id=`, `drive.usercontent.google.com/download?id=`) rồi tải qua `yt-dlp` GoogleDrive extractor; với cookie Google dán từ CookiePeek, service tạo auth header `SAPISIDHASH`/`SAPISID1PHASH`/`SAPISID3PHASH` từ `SAPISID`/`__Secure-1PAPISID`/`__Secure-3PAPISID` để đọc metadata file private; nếu `yt-dlp` vẫn bị 400/403 metadata thì fallback sang playback API đã xác thực và tải stream preview; ưu tiên file source nếu được phép tải, fallback stream preview cho video bị tắt download nhưng vẫn xem được; `Tải cả trang` gom file ID từ thư mục Drive rồi tải từng file, bỏ qua file lỗi và không nuốt lệnh `Dừng`; hỗ trợ cookie Google dán từ UI.
   - Instagram: dùng API profile + clips + feed riêng; dùng Clips API (`/api/v1/clips/user/`) làm nguồn chính cho Reels; bỏ qua carousel/ảnh/post giới hạn audience; ưu tiên Full HD ≤ 1920px, H.264+AAC/M4A; ưu tiên cookie UI → browser (Firefox/Edge/Chrome); retry không cookie nếu DPAPI lỗi.
   - Facebook: quét HTML trang/videos/reels và gọi thêm GraphQL cursor của Reels (`ProfileCometAppCollectionReelsRendererPaginationQuery`) để gom sâu hơn batch đầu trước khi gọi `yt-dlp`; profile numeric dùng `profile.php?id=<ID>&sk=reels_tab` cho tab Reels; tự đọc cookie browser; ưu tiên cookie UI; retry không cookie nếu DPAPI lỗi; chặn link `/people/...`.
   - YouTube: tải toàn kênh/playlist.

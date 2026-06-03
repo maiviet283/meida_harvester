@@ -130,7 +130,7 @@ app/
 
 ## Download Behavior
 
-- Tất cả nền tảng dùng `yt-dlp` qua service riêng.
+- Tất cả nền tảng dùng `yt-dlp` qua service riêng, **trừ Google Drive** (tải trực tiếp, xem mục Drive bên dưới).
 - Lỗi từ `yt-dlp` phải được map sang `UserFacingDownloadError` trong `app/platforms/common.py`.
 - `BaseDownloadService` giữ vòng đời tải chung: tạo thư mục, progress hook, gọi `yt-dlp`, map lỗi, helper FFmpeg và lọc duration.
 - `BaseDownloadService` giữ cờ hủy tải chung; nút `Dừng` gọi service cancel, raise `DownloadCancelled`.
@@ -144,7 +144,17 @@ app/
   - Instagram: dùng API profile + clips + feed riêng; dùng Clips API (`/api/v1/clips/user/`) làm nguồn chính cho Reels; bỏ qua carousel/ảnh/post giới hạn audience; ưu tiên Full HD ≤ 1920px, H.264+AAC/M4A; ưu tiên cookie UI → browser (Firefox/Edge/Chrome); retry không cookie nếu DPAPI lỗi.
   - Facebook: quét HTML trang/videos/reels để gom link trước khi gọi `yt-dlp`; tự đọc cookie browser; ưu tiên cookie UI; retry không cookie nếu DPAPI lỗi; chặn link `/people/...`.
   - YouTube: tải toàn kênh/playlist.
+  - Drive: quét HTML `embeddedfolderview` để gom tất cả file video trong thư mục, rồi tải từng file như video đơn.
 - Lọc duration: ngắn `≤ 180s`, dài `≥ 181s`. Logic nằm trong `BaseDownloadService` nhưng UI hiện không bật lựa chọn ngắn/dài cho nền tảng nào.
+
+### Google Drive (không dùng yt-dlp)
+- `app/platforms/drive/service.py` tải trực tiếp, **không** qua `yt-dlp` (extractor GoogleDrive của yt-dlp gọi endpoint playback `*-pa.googleapis.com` đã chết → luôn lỗi 400/403).
+- Nguồn stream: endpoint same-origin `https://drive.google.com/u/0/get_video_info?docid=<id>&drive_originator_app=303` — chỉ cần cookie thường (không cần SAPISIDHASH). Trả về `player_response` chứa progressive (đã ghép sẵn video+audio, tối đa 1080p itag 37) + adaptive streams với URL `videoplayback` đã ký.
+- Dùng được cho cả video **view-only/chặn tải** mà tài khoản (cookie) có quyền xem — đây là cách duy nhất, vì link tải gốc (`uc?export=download`) bị từ chối với file chặn tải.
+- **Bắt buộc ép IPv4** (`_IPv4HTTPSHandler`, bind `0.0.0.0`) cho cả lúc lấy metadata lẫn lúc tải: URL `videoplayback` ký kèm IP client; IPv6 temporary address xoay vòng làm IP lệch → 403.
+- **Bắt buộc tải theo chunk có `Range`** (10MB/chunk): googlevideo bóp băng thông xuống tốc độ phát nếu tải tuần tự không Range → treo.
+- Chọn format: ưu tiên progressive tốt nhất (1 file, không cần ghép); nếu chỉ có adaptive thì tải video+audio rồi ghép bằng FFmpeg (`_merge_streams`).
+- Cookie dán trong UI dùng trực tiếp ở header `Cookie` (không ghi file Netscape). Cần cookie tài khoản có quyền xem để tải file private/view-only.
 
 ## License & Monetization
 
