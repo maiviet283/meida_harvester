@@ -198,8 +198,7 @@ class BaseDownloadService:
                 self.raise_if_cancelled()
                 progress("reading", 18, None)
             self.raise_if_cancelled()
-            with YoutubeDL(options) as downloader:
-                downloader.download(urls)
+            self._download_with_transient_retry(options, urls, single)
         except DownloadCancelled as exc:
             raise UserFacingDownloadError("download_cancelled") from exc
         except DownloadError as exc:
@@ -207,6 +206,25 @@ class BaseDownloadService:
         finally:
             self.cleanup_manual_cookie_files()
         progress("finished", 100, None)
+
+    transient_retry_max = 0
+    transient_retry_markers: tuple[str, ...] = ()
+
+    def _download_with_transient_retry(self, options: dict, urls: list[str], single: bool) -> None:
+        attempts = self.transient_retry_max + 1 if (single and self.transient_retry_max > 0) else 1
+        for attempt in range(attempts):
+            try:
+                with YoutubeDL(options) as downloader:
+                    downloader.download(urls)
+                return
+            except DownloadError as exc:
+                if attempt + 1 >= attempts or not self._is_transient_error(exc):
+                    raise
+                self.raise_if_cancelled()
+
+    def _is_transient_error(self, exc: DownloadError) -> bool:
+        message = str(exc).lower()
+        return any(marker in message for marker in self.transient_retry_markers)
 
     def build_yt_dlp_options(self, folder: str, hook: Callable[[dict], None], single: bool) -> dict:
         raise NotImplementedError("Platform service must define yt-dlp options")

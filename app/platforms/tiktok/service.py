@@ -37,6 +37,13 @@ CONFIG = PlatformConfig(
 
 
 class TikTokService(BaseDownloadService):
+    transient_retry_max = 4
+    transient_retry_markers = (
+        "universal data for rehydration",
+        "unable to extract webpage",
+        "unable to extract video data",
+    )
+
     def download_single(self, url: str, folder: str, progress: ProgressCallback) -> None:
         self.download(url, folder, progress, single=True, page_filter="all")
 
