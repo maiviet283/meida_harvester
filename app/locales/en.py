@@ -150,6 +150,7 @@ TEXT = {
         "facebook_page_no_videos": "No public videos were found on this Facebook page.",
         "instagram_single_link": "This is not a direct Instagram video link. Use a reel, p, or tv link.",
         "instagram_no_video": "This Instagram post has no video to download. Use a Reel or a post that contains video.",
+        "instagram_story_unavailable": "Could not download this story. It may have expired (older than 24 hours), be a photo with no video, or you may need to log in with cookies that can view it.",
         "instagram_restricted": "This Instagram video is restricted to certain audiences and cannot be downloaded in public mode.",
         "instagram_cookie_failed": "Could not read Instagram cookies from the browser on this computer.",
         "instagram_cookie_unavailable": "Could not read Instagram browser cookies, and this link cannot be downloaded as public content. Sign in to Instagram in Edge/Chrome/Firefox or try another public link.",

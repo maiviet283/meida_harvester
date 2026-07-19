@@ -264,6 +264,72 @@ class InstagramServiceTest(unittest.TestCase):
             "https://www.instagram.com/reel/ABC123/",
         )
 
+    def test_accepts_and_normalizes_instagram_story_urls(self) -> None:
+        service = InstagramService()
+
+        story_url = (
+            "https://www.instagram.com/stories/_ngahynn_/3934676752244771355"
+            "?utm_source=ig_story_item_share&igsh=MXV6ZDgwcHVkNHJtMg=="
+        )
+        self.assertTrue(service.is_supported_video_url(story_url))
+        self.assertEqual(
+            service.normalize_video_url(story_url),
+            "https://www.instagram.com/stories/_ngahynn_/3934676752244771355/",
+        )
+        self.assertIsNone(service.extract_profile_username(story_url))
+        self.assertFalse(service.is_supported_video_url("https://www.instagram.com/stories/_ngahynn_/"))
+
+    def test_extracts_story_pk_only_for_shared_story_items(self) -> None:
+        service = InstagramService()
+
+        self.assertEqual(
+            service.extract_story_pk("https://www.instagram.com/stories/_ngahynn_/3934676752244771355/"),
+            "3934676752244771355",
+        )
+        self.assertIsNone(service.extract_story_pk("https://www.instagram.com/stories/highlights/18090946048123978/"))
+        self.assertIsNone(service.extract_story_pk("https://www.instagram.com/stories/_ngahynn_/"))
+        self.assertIsNone(service.extract_story_pk("https://www.instagram.com/reel/ABC123/"))
+
+    def test_story_options_download_reel_and_filter_to_target_item(self) -> None:
+        service = InstagramService()
+        service.story_target_pk = "3934676752244771355"
+
+        with patch.object(service, "has_ffmpeg", return_value=True), patch.object(
+            service, "find_browser_cookies", return_value=None
+        ):
+            options = service.build_yt_dlp_options("downloads", lambda info: None, single=True)
+
+        self.assertIs(options["noplaylist"], False)
+        match_filter = options["match_filter"]
+        target_code = "Daax6jLiYobcy9WxwlvIAeS-xW-1-cQVczmgqY0"
+        other_code = "DaawWYdCcACiUQeK5yHt91EIqufedhkWFVvbOA0"
+        self.assertIsNone(match_filter({"id": target_code}))
+        self.assertEqual(match_filter({"id": other_code}), "Skipped non-target Instagram story")
+        self.assertIsNone(match_filter({"id": target_code}, incomplete=True))
+
+    def test_reports_error_when_story_downloads_no_file(self) -> None:
+        service = InstagramService()
+        story_url = "https://www.instagram.com/stories/_ngahynn_/3934676752244771355/"
+
+        def fake_download_urls(self, urls, folder, progress, single, page_filter, emit_initial_progress=True):
+            service.finished_downloads = 0
+
+        with patch.object(BaseDownloadService, "download_urls", fake_download_urls):
+            with self.assertRaises(UserFacingDownloadError) as context:
+                service.download_urls([story_url], "downloads", lambda *args: None, True, "all")
+
+        self.assertEqual(context.exception.status_key, "instagram_story_unavailable")
+
+    def test_story_download_succeeds_when_a_file_is_written(self) -> None:
+        service = InstagramService()
+        story_url = "https://www.instagram.com/stories/_ngahynn_/3934676752244771355/"
+
+        def fake_download_urls(self, urls, folder, progress, single, page_filter, emit_initial_progress=True):
+            service.finished_downloads = 1
+
+        with patch.object(BaseDownloadService, "download_urls", fake_download_urls):
+            service.download_urls([story_url], "downloads", lambda *args: None, True, "all")
+
     def test_rejects_non_video_single_links(self) -> None:
         service = InstagramService()
 

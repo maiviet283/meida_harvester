@@ -170,6 +170,7 @@ class BaseDownloadService:
         emit_initial_progress: bool = True,
     ) -> None:
         Path(folder).mkdir(parents=True, exist_ok=True)
+        self.finished_downloads = 0
         if emit_initial_progress:
             progress("preparing", 8, None)
 
@@ -182,6 +183,7 @@ class BaseDownloadService:
                 percent = int(downloaded * 100 / total) if total else 35
                 progress("downloading", max(12, min(92, percent)), None)
             elif status == "finished":
+                self.finished_downloads += 1
                 progress("processing", 95, None)
 
         try:

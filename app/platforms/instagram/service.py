@@ -8,6 +8,7 @@ from urllib.parse import quote, urlencode, urlparse
 from urllib.request import Request, urlopen
 
 from yt_dlp.cookies import extract_cookies_from_browser
+from yt_dlp.extractor.instagram import _id_to_pk
 from yt_dlp.utils import DownloadError
 
 from app.platforms.common import BaseDownloadService, PlatformConfig, ProgressCallback, UserFacingDownloadError
@@ -56,6 +57,7 @@ INSTAGRAM_BROWSER_COOKIE_PATHS = (
     ("chrome", ("LOCALAPPDATA", "Google", "Chrome", "User Data")),
 )
 INSTAGRAM_VIDEO_PATHS = {"p", "reel", "reels", "tv"}
+INSTAGRAM_STORY_PREFIX = "stories"
 
 
 CONFIG = PlatformConfig(
@@ -80,6 +82,7 @@ class InstagramService(BaseDownloadService):
         self.browser_cookie_failed = False
         try:
             super().download_urls(urls, folder, progress, single, page_filter, emit_initial_progress)
+            self.raise_if_story_missing(urls, single)
         except UserFacingDownloadError as exc:
             if exc.status_key != "instagram_cookie_failed":
                 raise
@@ -87,6 +90,7 @@ class InstagramService(BaseDownloadService):
             self.use_browser_cookies = False
             try:
                 super().download_urls(urls, folder, progress, single, page_filter, emit_initial_progress)
+                self.raise_if_story_missing(urls, single)
             except UserFacingDownloadError as retry_exc:
                 if retry_exc.status_key in {"instagram_restricted", "login_required"}:
                     raise UserFacingDownloadError("instagram_cookie_unavailable") from retry_exc
@@ -98,6 +102,7 @@ class InstagramService(BaseDownloadService):
     def download_single(self, url: str, folder: str, progress: ProgressCallback) -> None:
         if not self.is_supported_video_url(url):
             raise UserFacingDownloadError("instagram_single_link")
+        self.story_target_pk = self.extract_story_pk(url)
         self.download(self.normalize_video_url(url), folder, progress, single=True, page_filter="all")
 
     def download_page(
@@ -107,6 +112,7 @@ class InstagramService(BaseDownloadService):
         progress: ProgressCallback,
         page_filter: str = "all",
     ) -> None:
+        self.story_target_pk = None
         self.raise_if_cancelled()
         progress("reading", 18, None)
         urls = self.collect_profile_video_urls(url, progress)
@@ -138,6 +144,9 @@ class InstagramService(BaseDownloadService):
             options["ignoreerrors"] = True
             options["ignore_no_formats_error"] = True
             options["match_filter"] = self.reject_non_video_post
+        elif getattr(self, "story_target_pk", None):
+            options["noplaylist"] = False
+            options["match_filter"] = self.build_story_match_filter(self.story_target_pk)
         if self.apply_manual_cookies(options, (".instagram.com",)):
             return options
         if getattr(self, "use_browser_cookies", True):
@@ -438,10 +447,15 @@ class InstagramService(BaseDownloadService):
         path_parts = [part for part in parsed.path.split("/") if part]
         if "instagram.com" not in host or len(path_parts) < 2:
             return url
-        if path_parts[0].lower() not in INSTAGRAM_VIDEO_PATHS:
+        first = path_parts[0].lower()
+        if first == INSTAGRAM_STORY_PREFIX:
+            if len(path_parts) >= 3:
+                return f"https://www.instagram.com/{'/'.join(path_parts[:3])}/"
+            return url
+        if first not in INSTAGRAM_VIDEO_PATHS:
             return url
 
-        kind = "reel" if path_parts[0].lower() == "reels" else path_parts[0].lower()
+        kind = "reel" if first == "reels" else first
         return f"https://www.instagram.com/{kind}/{path_parts[1]}/"
 
     def extract_profile_username(self, url: str) -> str | None:
@@ -450,9 +464,49 @@ class InstagramService(BaseDownloadService):
         path_parts = [part for part in parsed.path.split("/") if part]
         if "instagram.com" not in host or not path_parts:
             return None
-        if path_parts[0].lower() in INSTAGRAM_VIDEO_PATHS:
+        if path_parts[0].lower() in INSTAGRAM_VIDEO_PATHS or path_parts[0].lower() == INSTAGRAM_STORY_PREFIX:
             return None
         return path_parts[0]
+
+    def raise_if_story_missing(self, urls: list[str], single: bool) -> None:
+        if not single or len(urls) != 1 or not self.is_story_url(urls[0]):
+            return
+        if getattr(self, "finished_downloads", 0) == 0:
+            raise UserFacingDownloadError("instagram_story_unavailable")
+
+    def extract_story_pk(self, url: str) -> str | None:
+        parsed = urlparse(url)
+        path_parts = [part for part in parsed.path.split("/") if part]
+        if len(path_parts) < 3 or path_parts[0].lower() != INSTAGRAM_STORY_PREFIX:
+            return None
+        if path_parts[1].lower() == "highlights":
+            return None
+        return path_parts[2] if path_parts[2].isdigit() else None
+
+    def build_story_match_filter(self, story_pk: str) -> Callable[[dict], str | None]:
+        target = int(story_pk)
+
+        def match_filter(info: dict, *args, **kwargs) -> str | None:
+            if kwargs.get("incomplete"):
+                return None
+            entry_id = info.get("id")
+            try:
+                if entry_id and _id_to_pk(entry_id) == target:
+                    return None
+            except Exception:
+                pass
+            return "Skipped non-target Instagram story"
+
+        return match_filter
+
+    def is_story_url(self, url: str) -> bool:
+        try:
+            parsed = urlparse(url)
+            host = (parsed.hostname or "").lower()
+            path_parts = [part for part in parsed.path.split("/") if part]
+        except Exception:
+            return False
+        return "instagram.com" in host and bool(path_parts) and path_parts[0].lower() == INSTAGRAM_STORY_PREFIX
 
     def is_supported_video_url(self, url: str) -> bool:
         try:
@@ -464,4 +518,6 @@ class InstagramService(BaseDownloadService):
 
         if "instagram.com" not in host or len(path_parts) < 2:
             return False
+        if path_parts[0].lower() == INSTAGRAM_STORY_PREFIX:
+            return len(path_parts) >= 3 and path_parts[-1].isdigit()
         return path_parts[0].lower() in INSTAGRAM_VIDEO_PATHS

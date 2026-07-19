@@ -139,6 +139,7 @@ app/
 - TikTok: ưu tiên H.264+AAC, fallback format khác nếu không có MP4, chỉ dùng stream tách rời khi có FFmpeg.
 - YouTube: yêu cầu FFmpeg, ưu tiên M4A/AAC, không fallback về stream gộp sẵn.
 - `Tải video`: 1 link, 1 video, không phân biệt ngắn/dài.
+  - Instagram còn nhận link tin (story) `stories/<user>/<media_id>`. Extractor `instagram:story` của yt-dlp có bug: khi `--no-playlist` nó lọc item bằng `id == _pk_to_id(story_id)` nhưng `id` đã bị ghi đè bằng `code` dài của story → không bao giờ khớp, trả về rỗng mà không báo lỗi. Cách xử lý trong `InstagramService`: với story đơn, ép `noplaylist=False` để yt-dlp trả cả reel, rồi tự lọc đúng item bằng `match_filter` so `_id_to_pk(entry_id) == story_pk` (`build_story_match_filter`). Story cần cookie đăng nhập có quyền xem và chỉ sống 24h. Nếu không ghi được file nào (hết hạn/ảnh/không quyền) thì báo `instagram_story_unavailable` thay vì "hoàn tất" giả — dựa trên bộ đếm `finished_downloads` trong `BaseDownloadService`.
 - `Tải cả trang`:
   - TikTok: tải toàn profile; bỏ qua slideshow không có video track.
   - Douyin: tải toàn profile qua API `/aweme/v1/web/aweme/post/` (phân trang); **yêu cầu cookie phiên** dán trong UI — Douyin trả body rỗng nếu không có cookie (không cần `a_bogus` khi đã có cookie). Bỏ qua slideshow/ảnh. Video đơn vẫn tải không cần cookie qua trang share.

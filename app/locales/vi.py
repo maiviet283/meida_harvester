@@ -150,6 +150,7 @@ TEXT = {
         "facebook_page_no_videos": "Không tìm thấy video công khai nào trên trang Facebook này.",
         "instagram_single_link": "Link này không phải link video Instagram trực tiếp. Hãy dùng link dạng reel, p hoặc tv.",
         "instagram_no_video": "Bài Instagram này không có video để tải. Hãy dùng link Reel hoặc bài đăng có video.",
+        "instagram_story_unavailable": "Không tải được tin (story) này. Tin có thể đã hết hạn (quá 24 giờ), là ảnh không có video, hoặc bạn cần đăng nhập bằng cookie có quyền xem.",
         "instagram_restricted": "Video Instagram này bị giới hạn đối tượng xem nên không thể tải ở chế độ công khai.",
         "instagram_cookie_failed": "Không thể đọc cookie Instagram từ trình duyệt trên máy này.",
         "instagram_cookie_unavailable": "Không thể đọc cookie Instagram từ trình duyệt, và link này không tải được ở chế độ công khai. Hãy đăng nhập Instagram trên Edge/Chrome/Firefox hoặc thử link công khai khác.",
